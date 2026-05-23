@@ -7,6 +7,8 @@ const state = {
 
 const VALID_EXT = /\.(png|jpg|jpeg|webp)$/i;
 
+// ── Utilities ──────────────────────────────────────────────────────────────
+
 function nameFromFile(filename) {
   return filename.replace(/\.[^.]+$/, '').replace(/[-_]/g, ' ');
 }
@@ -16,7 +18,60 @@ function categoryFromPath(relPath) {
   return parts.length > 2 ? parts[1] : 'Uncategorized';
 }
 
-function loadLibrary(files) {
+async function srcToDataUrl(src) {
+  if (src.startsWith('data:')) return src;
+  const resp = await fetch(src);
+  if (!resp.ok) throw new Error(`Failed to fetch ${src}: ${resp.status}`);
+  const blob = await resp.blob();
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = (e) => resolve(e.target.result);
+    reader.onerror = reject;
+    reader.readAsDataURL(blob);
+  });
+}
+
+// ── Manifest / init ────────────────────────────────────────────────────────
+
+async function init() {
+  showLoadingMsg('Loading image library…');
+  try {
+    const resp = await fetch('manifest.json');
+    if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+    const manifest = await resp.json();
+    if (typeof manifest !== 'object' || manifest === null || Object.keys(manifest).length === 0) {
+      showNoImages();
+    } else {
+      loadFromManifest(manifest);
+    }
+  } catch (e) {
+    // Network error or missing file — show "no images" instructions
+    showNoImages();
+  }
+}
+
+function loadFromManifest(manifest) {
+  state.library = {};
+  for (const [cat, files] of Object.entries(manifest)) {
+    if (!Array.isArray(files) || files.length === 0) continue;
+    state.library[cat] = files
+      .filter((f) => VALID_EXT.test(f))
+      .map((f) => ({
+        name: nameFromFile(f),
+        src: `images/${cat}/${f}`,
+      }))
+      .sort((a, b) => a.name.localeCompare(b.name));
+  }
+  const cats = Object.keys(state.library).sort();
+  state.activeCategory = cats[0] || null;
+  hideStatusMsg();
+  renderCategories();
+  renderGrid();
+}
+
+// ── Local folder fallback ──────────────────────────────────────────────────
+
+function loadLocalLibrary(files) {
   state.library = {};
   const readers = [];
 
@@ -30,7 +85,7 @@ function loadLibrary(files) {
       reader.onload = (e) => {
         state.library[cat].push({
           name: nameFromFile(file.name),
-          dataUrl: e.target.result,
+          src: e.target.result,
         });
         resolve();
       };
@@ -45,10 +100,44 @@ function loadLibrary(files) {
     }
     const cats = Object.keys(state.library).sort();
     state.activeCategory = cats[0] || null;
+    hideStatusMsg();
     renderCategories();
     renderGrid();
   });
 }
+
+// ── Status / message helpers ───────────────────────────────────────────────
+
+function showLoadingMsg(text) {
+  const el = document.getElementById('status-msg');
+  el.className = 'loading-msg';
+  el.textContent = text;
+  el.style.display = 'block';
+
+  const empty = document.getElementById('empty-library');
+  empty.style.display = 'none';
+
+  const noImg = document.getElementById('no-images-msg');
+  if (noImg) noImg.style.display = 'none';
+}
+
+function hideStatusMsg() {
+  const el = document.getElementById('status-msg');
+  el.style.display = 'none';
+}
+
+function showNoImages() {
+  hideStatusMsg();
+  const grid = document.getElementById('mech-grid');
+  grid.innerHTML = '';
+  const empty = document.getElementById('empty-library');
+  empty.style.display = 'none';
+
+  const noImg = document.getElementById('no-images-msg');
+  if (noImg) noImg.style.display = 'block';
+}
+
+// ── Render ─────────────────────────────────────────────────────────────────
 
 function renderCategories() {
   const list = document.getElementById('category-list');
@@ -85,7 +174,7 @@ function renderGrid() {
     thumb.className = 'mech-thumb';
 
     const img = document.createElement('img');
-    img.src = mech.dataUrl;
+    img.src = mech.src;
     img.alt = mech.name;
     img.loading = 'lazy';
 
@@ -100,12 +189,14 @@ function renderGrid() {
   });
 }
 
+// ── Roster ─────────────────────────────────────────────────────────────────
+
 function addToRoster(mech, category) {
   const entry = {
     id: state.nextId++,
     name: mech.name,
     category: category,
-    dataUrl: mech.dataUrl,
+    src: mech.src,
     pilotName: '',
     gunnery: 4,
     piloting: 5,
@@ -174,7 +265,7 @@ function buildCard(entry) {
   const imgWrap = document.createElement('div');
   imgWrap.className = 'card-image';
   const img = document.createElement('img');
-  img.src = entry.dataUrl;
+  img.src = entry.src;
   img.alt = entry.name;
   imgWrap.appendChild(img);
 
@@ -239,113 +330,139 @@ function makeSkillPair(labelText, entry, key) {
   return wrap;
 }
 
-function exportPDF() {
+// ── PDF Export ─────────────────────────────────────────────────────────────
+
+async function exportPDF() {
   if (state.roster.length === 0) {
     alert('Roster is empty — add some mechs first.');
     return;
   }
 
-  const { jsPDF } = window.jspdf;
-  const doc = new jsPDF({ unit: 'pt', format: 'letter', orientation: 'portrait' });
+  const btn = document.getElementById('export-btn');
+  btn.disabled = true;
+  btn.textContent = 'Generating PDF…';
 
-  const PAGE_W = 612;
-  const PAGE_H = 792;
-  const MARGIN = 36;
-  const GAP = 6;
-  const COLS = 3;
-  const ROWS = 3;
+  try {
+    // Pre-fetch all images to data URLs
+    const dataUrls = await Promise.all(
+      state.roster.map((entry) => srcToDataUrl(entry.src).catch(() => null))
+    );
 
-  const CARD_W = (PAGE_W - MARGIN * 2 - GAP * (COLS - 1)) / COLS;
-  const CARD_H = (PAGE_H - MARGIN * 2 - GAP * (ROWS - 1)) / ROWS;
+    const { jsPDF } = window.jspdf;
+    const doc = new jsPDF({ unit: 'pt', format: 'letter', orientation: 'portrait' });
 
-  const HEADER_H = 22;
-  const INFO_H = 54;
-  const IMG_H = CARD_H - HEADER_H - INFO_H;
+    const PAGE_W = 612;
+    const PAGE_H = 792;
+    const MARGIN = 36;
+    const GAP = 6;
+    const COLS = 3;
+    const ROWS = 3;
 
-  const BROWN = [59, 34, 8];
-  const GOLD_TEXT = [201, 168, 76];
-  const TAN_BG = [212, 201, 168];
-  const BORDER_COLOR = [90, 73, 40];
-  const DARK_INFO = [30, 30, 30];
-  const TAN_TEXT = [168, 159, 130];
-  const DIM_TEXT = [120, 110, 90];
+    const CARD_W = (PAGE_W - MARGIN * 2 - GAP * (COLS - 1)) / COLS;
+    const CARD_H = (PAGE_H - MARGIN * 2 - GAP * (ROWS - 1)) / ROWS;
 
-  state.roster.forEach((entry, idx) => {
-    const page = Math.floor(idx / (COLS * ROWS));
-    const pos = idx % (COLS * ROWS);
-    const col = pos % COLS;
-    const row = Math.floor(pos / COLS);
+    const HEADER_H = 22;
+    const INFO_H = 54;
+    const IMG_H = CARD_H - HEADER_H - INFO_H;
 
-    if (pos === 0 && idx > 0) doc.addPage();
+    const BROWN = [59, 34, 8];
+    const GOLD_TEXT = [201, 168, 76];
+    const TAN_BG = [212, 201, 168];
+    const BORDER_COLOR = [90, 73, 40];
+    const DARK_INFO = [30, 30, 30];
+    const TAN_TEXT = [168, 159, 130];
+    const DIM_TEXT = [120, 110, 90];
 
-    const x = MARGIN + col * (CARD_W + GAP);
-    const y = MARGIN + row * (CARD_H + GAP);
+    state.roster.forEach((entry, idx) => {
+      const pos = idx % (COLS * ROWS);
+      const col = pos % COLS;
+      const row = Math.floor(pos / COLS);
 
-    doc.setFillColor(...TAN_BG);
-    doc.roundedRect(x, y, CARD_W, CARD_H, 4, 4, 'F');
+      if (pos === 0 && idx > 0) doc.addPage();
 
-    doc.setDrawColor(...BORDER_COLOR);
-    doc.setLineWidth(1);
-    doc.roundedRect(x, y, CARD_W, CARD_H, 4, 4, 'S');
+      const x = MARGIN + col * (CARD_W + GAP);
+      const y = MARGIN + row * (CARD_H + GAP);
 
-    doc.setFillColor(...BROWN);
-    doc.roundedRect(x, y, CARD_W, HEADER_H, 4, 4, 'F');
-    doc.setFillColor(...BROWN);
-    doc.rect(x, y + HEADER_H - 4, CARD_W, 4, 'F');
+      doc.setFillColor(...TAN_BG);
+      doc.roundedRect(x, y, CARD_W, CARD_H, 4, 4, 'F');
 
-    doc.setFont('helvetica', 'bold');
-    doc.setFontSize(9);
-    doc.setTextColor(...GOLD_TEXT);
-    const mechLabel = entry.name.toUpperCase();
-    const labelW = doc.getTextWidth(mechLabel);
-    const maxW = CARD_W - 10;
-    if (labelW > maxW) {
+      doc.setDrawColor(...BORDER_COLOR);
+      doc.setLineWidth(1);
+      doc.roundedRect(x, y, CARD_W, CARD_H, 4, 4, 'S');
+
+      doc.setFillColor(...BROWN);
+      doc.roundedRect(x, y, CARD_W, HEADER_H, 4, 4, 'F');
+      doc.setFillColor(...BROWN);
+      doc.rect(x, y + HEADER_H - 4, CARD_W, 4, 'F');
+
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(9);
+      doc.setTextColor(...GOLD_TEXT);
+      const mechLabel = entry.name.toUpperCase();
+      const labelW = doc.getTextWidth(mechLabel);
+      const maxW = CARD_W - 10;
+      if (labelW > maxW) {
+        doc.setFontSize(7);
+      }
+      doc.text(mechLabel, x + CARD_W / 2, y + HEADER_H - 7, { align: 'center' });
+      doc.setFontSize(9);
+
+      const dataUrl = dataUrls[idx];
+      if (dataUrl) {
+        try {
+          const fmt = dataUrl.split(';')[0].split('/')[1].toUpperCase();
+          const safeFormat = ['PNG', 'JPEG', 'JPG', 'WEBP'].includes(fmt) ? fmt : 'PNG';
+          doc.addImage(dataUrl, safeFormat, x + 2, y + HEADER_H, CARD_W - 4, IMG_H, undefined, 'FAST');
+        } catch (e) {
+          doc.setFillColor(30, 30, 30);
+          doc.rect(x + 2, y + HEADER_H, CARD_W - 4, IMG_H, 'F');
+        }
+      } else {
+        doc.setFillColor(30, 30, 30);
+        doc.rect(x + 2, y + HEADER_H, CARD_W - 4, IMG_H, 'F');
+      }
+
+      const infoY = y + HEADER_H + IMG_H;
+      doc.setFillColor(...DARK_INFO);
+      doc.rect(x, infoY, CARD_W, INFO_H, 'F');
+      doc.setFillColor(...BORDER_COLOR);
+      doc.rect(x, infoY, CARD_W, 1, 'F');
+
+      doc.setFont('courier', 'bold');
+      doc.setFontSize(8);
+      doc.setTextColor(...TAN_TEXT);
+      const pilotDisplay = entry.pilotName || '—';
+      doc.text('PILOT: ' + pilotDisplay, x + 6, infoY + 13);
+
+      doc.setFont('courier', 'bold');
+      doc.setFontSize(9);
+      doc.setTextColor(...GOLD_TEXT);
+      doc.text('GUN: ' + entry.gunnery, x + 6, infoY + 28);
+      doc.text('PIL: ' + entry.piloting, x + CARD_W / 2 + 2, infoY + 28);
+
+      doc.setFont('courier', 'italic');
       doc.setFontSize(7);
-    }
-    doc.text(mechLabel, x + CARD_W / 2, y + HEADER_H - 7, { align: 'center' });
-    doc.setFontSize(9);
+      doc.setTextColor(...DIM_TEXT);
+      doc.text(entry.category, x + CARD_W - 6, infoY + INFO_H - 7, { align: 'right' });
+    });
 
-    try {
-      const fmt = entry.dataUrl.split(';')[0].split('/')[1].toUpperCase();
-      const safeFormat = ['PNG', 'JPEG', 'JPG', 'WEBP'].includes(fmt) ? fmt : 'PNG';
-      doc.addImage(entry.dataUrl, safeFormat, x + 2, y + HEADER_H, CARD_W - 4, IMG_H, undefined, 'FAST');
-    } catch (e) {
-      doc.setFillColor(30, 30, 30);
-      doc.rect(x + 2, y + HEADER_H, CARD_W - 4, IMG_H, 'F');
-    }
-
-    const infoY = y + HEADER_H + IMG_H;
-    doc.setFillColor(...DARK_INFO);
-    doc.rect(x, infoY, CARD_W, INFO_H, 'F');
-    doc.setFillColor(...BORDER_COLOR);
-    doc.rect(x, infoY, CARD_W, 1, 'F');
-
-    doc.setFont('courier', 'bold');
-    doc.setFontSize(8);
-    doc.setTextColor(...TAN_TEXT);
-    const pilotDisplay = entry.pilotName || '—';
-    doc.text('PILOT: ' + pilotDisplay, x + 6, infoY + 13);
-
-    doc.setFont('courier', 'bold');
-    doc.setFontSize(9);
-    doc.setTextColor(...GOLD_TEXT);
-    doc.text('GUN: ' + entry.gunnery, x + 6, infoY + 28);
-    doc.text('PIL: ' + entry.piloting, x + CARD_W / 2 + 2, infoY + 28);
-
-    doc.setFont('courier', 'italic');
-    doc.setFontSize(7);
-    doc.setTextColor(...DIM_TEXT);
-    doc.text(entry.category, x + CARD_W - 6, infoY + INFO_H - 7, { align: 'right' });
-  });
-
-  doc.save('battletech-roster.pdf');
+    doc.save('battletech-roster.pdf');
+  } finally {
+    btn.disabled = false;
+    btn.textContent = 'Export PDF';
+  }
 }
 
+// ── Event listeners ────────────────────────────────────────────────────────
+
 document.getElementById('folder-input').addEventListener('change', (e) => {
-  loadLibrary(Array.from(e.target.files));
+  loadLocalLibrary(Array.from(e.target.files));
   e.target.value = '';
 });
 
 document.getElementById('export-btn').addEventListener('click', exportPDF);
 
+// ── Boot ───────────────────────────────────────────────────────────────────
+
 renderRoster();
+init();

@@ -111,6 +111,25 @@ header h1 {
   background: var(--gold);
   box-shadow: 0 0 10px rgba(201,168,76,0.5);
 }
+.btn-export:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+  box-shadow: none;
+}
+
+.btn-secondary {
+  background: #2a2a2a;
+  color: var(--tan-dim);
+  border: 1px solid var(--border);
+  font-size: 11px;
+  padding: 5px 12px;
+  letter-spacing: 0.8px;
+}
+.btn-secondary:hover {
+  background: #333;
+  color: var(--tan);
+  border-color: #555;
+}
 
 /* ── MAIN LAYOUT ── */
 main {
@@ -197,6 +216,64 @@ main {
   font-size: 11px;
   color: #555;
   margin-top: 6px;
+}
+
+/* ── Loading message ── */
+.loading-msg {
+  text-align: center;
+  color: var(--text-dim);
+  padding: 40px 20px;
+  font-size: 12px;
+  letter-spacing: 1px;
+  animation: pulse 1.4s ease-in-out infinite;
+}
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50%       { opacity: 0.4; }
+}
+
+/* ── No-images instructions ── */
+.no-images-msg {
+  padding: 24px 18px;
+  color: var(--text-dim);
+  line-height: 1.8;
+  font-size: 12px;
+}
+.no-images-title {
+  color: var(--gold-dim);
+  font-weight: 700;
+  font-size: 13px;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  margin-bottom: 10px;
+}
+.no-images-msg ol {
+  padding-left: 18px;
+  margin: 8px 0 10px;
+}
+.no-images-msg li {
+  margin-bottom: 6px;
+}
+.no-images-msg code {
+  background: #1e1e1e;
+  border: 1px solid var(--border);
+  border-radius: 3px;
+  padding: 1px 5px;
+  font-family: var(--font);
+  font-size: 11px;
+  color: var(--tan);
+}
+.no-images-msg strong {
+  color: var(--tan);
+}
+.no-images-msg em {
+  font-style: italic;
+  color: var(--tan-dim);
+}
+.no-images-msg .hint {
+  font-size: 11px;
+  color: #555;
+  margin-top: 8px;
 }
 
 .mech-thumb {

@@ -12,8 +12,8 @@
     <div class="header-inner">
       <h1>BATTLETECH ROSTER BUILDER</h1>
       <div class="header-actions">
-        <label class="btn btn-primary" for="folder-input">
-          Load Image Library
+        <label class="btn btn-secondary" for="folder-input" title="Load images from a local folder">
+          Load local images
           <input type="file" id="folder-input" webkitdirectory accept=".png,.jpg,.jpeg,.webp" multiple>
         </label>
         <button class="btn btn-export" id="export-btn">Export PDF</button>
@@ -28,10 +28,27 @@
         <div id="category-list"></div>
       </div>
       <div id="mech-grid-container">
+        <!-- Loading spinner shown while fetching manifest -->
+        <div id="status-msg" class="loading-msg" style="display:none;"></div>
+
         <div id="mech-grid"></div>
-        <div id="empty-library">
+
+        <!-- Shown when library is empty after manifest load -->
+        <div id="empty-library" style="display:none;">
           <p>Load a folder of mech images to begin.</p>
           <p class="hint">Subfolders become categories.</p>
+        </div>
+
+        <!-- Shown when manifest is missing or empty -->
+        <div id="no-images-msg" class="no-images-msg" style="display:none;">
+          <p class="no-images-title">No images found</p>
+          <p>To add mechs to this library:</p>
+          <ol>
+            <li>Add images to <code>images/[Category]/mech.png</code> in the repo.</li>
+            <li>Run <code>python generate-manifest.py</code> locally, or push to <strong>main</strong> — GitHub Actions will update <code>manifest.json</code> automatically.</li>
+            <li>Enable GitHub Pages in <em>Settings → Pages → Deploy from main branch</em>.</li>
+          </ol>
+          <p class="hint">Or use "Load local images" above to test with a local folder.</p>
         </div>
       </div>
     </aside>

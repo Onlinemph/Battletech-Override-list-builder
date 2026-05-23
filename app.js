@@ -18,6 +18,18 @@ function categoryFromPath(relPath) {
   return parts.length > 2 ? parts[1] : 'Uncategorized';
 }
 
+function categoryFromZipPath(relPath) {
+  const parts = relPath.split('/').filter((p) => p.length > 0);
+  if (parts.length === 1) return 'Uncategorized';
+  if (parts.length === 2) return parts[0];
+  return parts[1]; // 3+ levels: skip root folder (e.g. "images/")
+}
+
+function mimeFromFilename(filename) {
+  const ext = filename.split('.').pop().toLowerCase();
+  return { png: 'image/png', jpg: 'image/jpeg', jpeg: 'image/jpeg', webp: 'image/webp' }[ext] || 'image/png';
+}
+
 async function srcToDataUrl(src) {
   if (src.startsWith('data:')) return src;
   const resp = await fetch(src);
@@ -104,6 +116,48 @@ function loadLocalLibrary(files) {
     renderCategories();
     renderGrid();
   });
+}
+
+// ── Zip loader ─────────────────────────────────────────────────────────────
+
+async function loadZip(file) {
+  showLoadingMsg(`Extracting ${file.name}…`);
+  try {
+    const zip = await JSZip.loadAsync(file);
+    state.library = {};
+    const tasks = [];
+
+    zip.forEach((relPath, entry) => {
+      if (entry.dir || !VALID_EXT.test(relPath)) return;
+      const parts = relPath.split('/').filter((p) => p.length > 0);
+      const filename = parts[parts.length - 1];
+      const cat = categoryFromZipPath(relPath);
+      if (!state.library[cat]) state.library[cat] = [];
+
+      tasks.push(
+        entry.async('base64').then((b64) => {
+          state.library[cat].push({
+            name: nameFromFile(filename),
+            src: `data:${mimeFromFilename(filename)};base64,${b64}`,
+          });
+        })
+      );
+    });
+
+    await Promise.all(tasks);
+
+    for (const cat of Object.keys(state.library)) {
+      state.library[cat].sort((a, b) => a.name.localeCompare(b.name));
+    }
+    const cats = Object.keys(state.library).sort();
+    state.activeCategory = cats[0] || null;
+    hideStatusMsg();
+    renderCategories();
+    renderGrid();
+  } catch (err) {
+    hideStatusMsg();
+    alert('Failed to load zip: ' + err.message);
+  }
 }
 
 // ── Status / message helpers ───────────────────────────────────────────────
@@ -454,6 +508,11 @@ async function exportPDF() {
 }
 
 // ── Event listeners ────────────────────────────────────────────────────────
+
+document.getElementById('zip-input').addEventListener('change', (e) => {
+  if (e.target.files[0]) loadZip(e.target.files[0]);
+  e.target.value = '';
+});
 
 document.getElementById('folder-input').addEventListener('change', (e) => {
   loadLocalLibrary(Array.from(e.target.files));

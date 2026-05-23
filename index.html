@@ -6,14 +6,19 @@
   <title>BattleTech Roster Builder</title>
   <link rel="stylesheet" href="style.css">
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 </head>
 <body>
   <header>
     <div class="header-inner">
       <h1>BATTLETECH ROSTER BUILDER</h1>
       <div class="header-actions">
+        <label class="btn btn-primary" for="zip-input" title="Load a zip of mech images">
+          Load zip
+          <input type="file" id="zip-input" accept=".zip">
+        </label>
         <label class="btn btn-secondary" for="folder-input" title="Load images from a local folder">
-          Load local images
+          Load folder
           <input type="file" id="folder-input" webkitdirectory accept=".png,.jpg,.jpeg,.webp" multiple>
         </label>
         <button class="btn btn-export" id="export-btn">Export PDF</button>
@@ -48,7 +53,7 @@
             <li>Run <code>python generate-manifest.py</code> locally, or push to <strong>main</strong> — GitHub Actions will update <code>manifest.json</code> automatically.</li>
             <li>Enable GitHub Pages in <em>Settings → Pages → Deploy from main branch</em>.</li>
           </ol>
-          <p class="hint">Or use "Load local images" above to test with a local folder.</p>
+          <p class="hint">Or use "Load zip" or "Load folder" above to use a local image collection.</p>
         </div>
       </div>
     </aside>

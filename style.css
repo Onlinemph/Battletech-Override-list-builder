@@ -1,0 +1,450 @@
+*, *::before, *::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+:root {
+  --bg:        #1a1a1a;
+  --panel-l:   #111111;
+  --panel-r:   #1f1f1f;
+  --card-bg:   #252525;
+  --border:    #333333;
+  --tan:       #d4c9a8;
+  --tan-dim:   #a89f82;
+  --gold:      #c9a84c;
+  --gold-dim:  #8a6e28;
+  --olive:     #5a6b3a;
+  --olive-dk:  #3d4a26;
+  --red:       #8b2020;
+  --text:      #e0d8c4;
+  --text-dim:  #8a8070;
+  --font:      'Courier New', Courier, monospace;
+  --radius:    4px;
+  --header-h: 56px;
+}
+
+html, body {
+  height: 100%;
+  overflow: hidden;
+}
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font);
+  font-size: 13px;
+  display: flex;
+  flex-direction: column;
+}
+
+/* ── HEADER ── */
+header {
+  height: var(--header-h);
+  background: #0d0d0d;
+  border-bottom: 2px solid var(--gold-dim);
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  padding: 0 20px;
+}
+
+.header-inner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+}
+
+header h1 {
+  font-size: 18px;
+  letter-spacing: 4px;
+  color: var(--gold);
+  text-shadow: 0 0 12px rgba(201,168,76,0.4);
+  font-weight: 700;
+}
+
+.header-actions {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+}
+
+/* ── BUTTONS ── */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 7px 16px;
+  font-family: var(--font);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+  cursor: pointer;
+  border: none;
+  border-radius: var(--radius);
+  transition: background 0.15s, color 0.15s, box-shadow 0.15s;
+  white-space: nowrap;
+}
+
+.btn input[type="file"] {
+  display: none;
+}
+
+.btn-primary {
+  background: var(--olive);
+  color: var(--tan);
+  border: 1px solid var(--olive-dk);
+}
+.btn-primary:hover {
+  background: #6e8247;
+  box-shadow: 0 0 8px rgba(90,107,58,0.6);
+}
+
+.btn-export {
+  background: var(--gold-dim);
+  color: #0d0d0d;
+  border: 1px solid var(--gold);
+}
+.btn-export:hover {
+  background: var(--gold);
+  box-shadow: 0 0 10px rgba(201,168,76,0.5);
+}
+
+/* ── MAIN LAYOUT ── */
+main {
+  display: flex;
+  flex: 1;
+  overflow: hidden;
+}
+
+/* ── LEFT PANEL ── */
+#left-panel {
+  width: 300px;
+  flex-shrink: 0;
+  background: var(--panel-l);
+  border-right: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+#category-bar {
+  padding: 10px 12px 8px;
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+}
+
+.panel-label {
+  display: block;
+  font-size: 10px;
+  letter-spacing: 3px;
+  color: var(--text-dim);
+  margin-bottom: 8px;
+}
+
+#category-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.cat-btn {
+  padding: 4px 12px;
+  background: #2a2a2a;
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  color: var(--tan-dim);
+  font-family: var(--font);
+  font-size: 11px;
+  cursor: pointer;
+  letter-spacing: 0.5px;
+  transition: background 0.12s, color 0.12s, border-color 0.12s;
+}
+.cat-btn:hover {
+  background: var(--olive-dk);
+  color: var(--tan);
+  border-color: var(--olive);
+}
+.cat-btn.active {
+  background: var(--olive);
+  color: var(--tan);
+  border-color: #7a9050;
+}
+
+#mech-grid-container {
+  flex: 1;
+  overflow-y: auto;
+  padding: 10px;
+  scrollbar-width: thin;
+  scrollbar-color: var(--border) transparent;
+}
+
+#mech-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 6px;
+}
+
+#empty-library {
+  text-align: center;
+  color: var(--text-dim);
+  padding: 40px 20px;
+  line-height: 1.8;
+}
+#empty-library .hint {
+  font-size: 11px;
+  color: #555;
+  margin-top: 6px;
+}
+
+.mech-thumb {
+  aspect-ratio: 1;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  cursor: pointer;
+  overflow: hidden;
+  position: relative;
+  background: #1a1a1a;
+  transition: border-color 0.12s, box-shadow 0.12s;
+}
+.mech-thumb:hover {
+  border-color: var(--gold);
+  box-shadow: 0 0 8px rgba(201,168,76,0.4);
+}
+.mech-thumb img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  display: block;
+}
+.mech-thumb-name {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  background: rgba(0,0,0,0.75);
+  color: var(--tan-dim);
+  font-size: 9px;
+  text-align: center;
+  padding: 2px 3px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  letter-spacing: 0.3px;
+}
+
+/* ── RIGHT PANEL ── */
+#right-panel {
+  flex: 1;
+  background: var(--panel-r);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.roster-header {
+  padding: 10px 16px 8px;
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-shrink: 0;
+}
+
+#roster-count {
+  font-size: 11px;
+  color: var(--text-dim);
+  letter-spacing: 1px;
+}
+
+#roster-list {
+  flex: 1;
+  overflow-y: auto;
+  padding: 12px;
+  scrollbar-width: thin;
+  scrollbar-color: var(--border) transparent;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 12px;
+  align-content: start;
+}
+
+#empty-roster {
+  grid-column: 1 / -1;
+  text-align: center;
+  color: var(--text-dim);
+  padding: 60px 20px;
+  line-height: 1.8;
+}
+#empty-roster .hint {
+  font-size: 11px;
+  color: #555;
+  margin-top: 6px;
+}
+
+/* ── ROSTER CARD ── */
+.roster-card {
+  background: var(--card-bg);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  transition: border-color 0.15s;
+}
+.roster-card:hover {
+  border-color: #444;
+}
+
+.card-header {
+  background: #3b2208;
+  padding: 7px 10px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.card-mech-name {
+  color: var(--gold);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  flex: 1;
+}
+.card-remove {
+  background: none;
+  border: none;
+  color: #664444;
+  font-size: 16px;
+  cursor: pointer;
+  line-height: 1;
+  padding: 0 0 0 8px;
+  flex-shrink: 0;
+  transition: color 0.12s;
+}
+.card-remove:hover {
+  color: #cc4444;
+}
+
+.card-image {
+  width: 100%;
+  aspect-ratio: 1;
+  background: #111;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.card-image img {
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
+  display: block;
+}
+
+.card-info {
+  padding: 8px 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  background: #1e1e1e;
+}
+
+.card-field {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  color: var(--tan-dim);
+  letter-spacing: 0.5px;
+}
+.card-field label {
+  flex-shrink: 0;
+  text-transform: uppercase;
+  font-size: 10px;
+  color: var(--text-dim);
+}
+
+.card-field input[type="text"],
+.card-field input[type="number"] {
+  flex: 1;
+  background: #111;
+  border: 1px solid #333;
+  border-radius: 3px;
+  color: var(--tan);
+  font-family: var(--font);
+  font-size: 11px;
+  padding: 3px 6px;
+  outline: none;
+  min-width: 0;
+  transition: border-color 0.12s;
+}
+.card-field input[type="text"]:focus,
+.card-field input[type="number"]:focus {
+  border-color: var(--olive);
+}
+
+.card-field input[type="number"] {
+  flex: none;
+  width: 52px;
+  text-align: center;
+}
+
+.card-skills {
+  display: flex;
+  gap: 10px;
+}
+.skill-pair {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 11px;
+}
+.skill-pair label {
+  color: var(--text-dim);
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+.skill-pair input[type="number"] {
+  width: 48px;
+  background: #111;
+  border: 1px solid #333;
+  border-radius: 3px;
+  color: var(--gold);
+  font-family: var(--font);
+  font-size: 12px;
+  font-weight: 700;
+  padding: 3px 4px;
+  text-align: center;
+  outline: none;
+  transition: border-color 0.12s;
+}
+.skill-pair input[type="number"]:focus {
+  border-color: var(--gold-dim);
+}
+
+.card-category {
+  font-size: 10px;
+  color: #555;
+  font-style: italic;
+  letter-spacing: 0.3px;
+  text-align: right;
+}
+
+/* scrollbars */
+::-webkit-scrollbar {
+  width: 6px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: #333;
+  border-radius: 3px;
+}

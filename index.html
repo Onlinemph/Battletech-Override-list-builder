@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>BattleTech Roster Builder</title>
+  <link rel="stylesheet" href="style.css">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+</head>
+<body>
+  <header>
+    <div class="header-inner">
+      <h1>BATTLETECH ROSTER BUILDER</h1>
+      <div class="header-actions">
+        <label class="btn btn-primary" for="folder-input">
+          Load Image Library
+          <input type="file" id="folder-input" webkitdirectory accept=".png,.jpg,.jpeg,.webp" multiple>
+        </label>
+        <button class="btn btn-export" id="export-btn">Export PDF</button>
+      </div>
+    </div>
+  </header>
+
+  <main>
+    <aside id="left-panel">
+      <div id="category-bar">
+        <span class="panel-label">CATEGORIES</span>
+        <div id="category-list"></div>
+      </div>
+      <div id="mech-grid-container">
+        <div id="mech-grid"></div>
+        <div id="empty-library">
+          <p>Load a folder of mech images to begin.</p>
+          <p class="hint">Subfolders become categories.</p>
+        </div>
+      </div>
+    </aside>
+
+    <section id="right-panel">
+      <div class="roster-header">
+        <span class="panel-label">ROSTER</span>
+        <span id="roster-count">0 mechs</span>
+      </div>
+      <div id="roster-list">
+        <div id="empty-roster">
+          <p>No mechs selected.</p>
+          <p class="hint">Click thumbnails on the left to add mechs.</p>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <script src="app.js"></script>
+</body>
+</html>

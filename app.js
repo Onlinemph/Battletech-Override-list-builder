@@ -448,7 +448,7 @@ async function renderCardCanvas(entry) {
   // (Gunnery/Piloting boxes sit in the top-right of the card).
   const boxW  = iw * 0.054;
   const boxH  = ih * 0.065;
-  const boxY  = iy + ih * 0.030;
+  const boxY  = iy + ih * 0.070;
   const gunX  = ix + iw * 0.528;
   const pilX  = ix + iw * 0.616;
 

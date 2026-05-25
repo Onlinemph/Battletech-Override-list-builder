@@ -503,7 +503,6 @@ main {
   color: var(--text-dim);
   flex-shrink: 0;
 }
-.group-count.over { color: #cc4444; }
 
 .group-delete {
   background: none;

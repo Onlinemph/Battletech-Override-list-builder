@@ -351,7 +351,6 @@ function renderRoster() {
 }
 
 function buildGroupSection(group, mechs) {
-  const maxMechs = group.type === 'lance' ? 4 : 5;
   const isActive = group.id === state.activeGroupId;
 
   const section = document.createElement('div');
@@ -378,8 +377,8 @@ function buildGroupSection(group, mechs) {
   nameInput.addEventListener('input', e => { group.name = e.target.value; });
 
   const countSpan = document.createElement('span');
-  countSpan.className = 'group-count' + (mechs.length > maxMechs ? ' over' : '');
-  countSpan.textContent = `${mechs.length}/${maxMechs}`;
+  countSpan.className = 'group-count';
+  countSpan.textContent = mechs.length;
 
   const deleteBtn = document.createElement('button');
   deleteBtn.className = 'group-delete';

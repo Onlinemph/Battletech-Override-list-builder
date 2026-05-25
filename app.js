@@ -3,7 +3,19 @@ const state = {
   roster: [],
   activeCategory: null,
   nextId: 1,
+  blobUrls: new Set(),
 };
+
+function makeBlobUrl(blob) {
+  const url = URL.createObjectURL(blob);
+  state.blobUrls.add(url);
+  return url;
+}
+
+function revokeBlobUrls() {
+  for (const url of state.blobUrls) URL.revokeObjectURL(url);
+  state.blobUrls.clear();
+}
 
 const VALID_EXT = /\.(png|jpg|jpeg|webp)$/i;
 
@@ -84,43 +96,33 @@ function loadFromManifest(manifest) {
 // ── Local folder fallback ──────────────────────────────────────────────────
 
 function loadLocalLibrary(files) {
+  revokeBlobUrls();
   state.library = {};
-  const readers = [];
 
   for (const file of files) {
     if (!VALID_EXT.test(file.name)) continue;
     const cat = categoryFromPath(file.webkitRelativePath);
     if (!state.library[cat]) state.library[cat] = [];
-
-    const p = new Promise((resolve) => {
-      const reader = new FileReader();
-      reader.onload = (e) => {
-        state.library[cat].push({
-          name: nameFromFile(file.name),
-          src: e.target.result,
-        });
-        resolve();
-      };
-      reader.readAsDataURL(file);
+    state.library[cat].push({
+      name: nameFromFile(file.name),
+      src: makeBlobUrl(file),
     });
-    readers.push(p);
   }
 
-  Promise.all(readers).then(() => {
-    for (const cat of Object.keys(state.library)) {
-      state.library[cat].sort((a, b) => a.name.localeCompare(b.name));
-    }
-    const cats = Object.keys(state.library).sort();
-    state.activeCategory = cats[0] || null;
-    hideStatusMsg();
-    renderCategories();
-    renderGrid();
-  });
+  for (const cat of Object.keys(state.library)) {
+    state.library[cat].sort((a, b) => a.name.localeCompare(b.name));
+  }
+  const cats = Object.keys(state.library).sort();
+  state.activeCategory = cats[0] || null;
+  hideStatusMsg();
+  renderCategories();
+  renderGrid();
 }
 
 // ── Zip loader ─────────────────────────────────────────────────────────────
 
 async function loadZip(file) {
+  revokeBlobUrls();
   showLoadingMsg(`Extracting ${file.name}…`);
   try {
     const zip = await JSZip.loadAsync(file);
@@ -135,10 +137,10 @@ async function loadZip(file) {
       if (!state.library[cat]) state.library[cat] = [];
 
       tasks.push(
-        entry.async('base64').then((b64) => {
+        entry.async('blob').then((blob) => {
           state.library[cat].push({
             name: nameFromFile(filename),
-            src: `data:${mimeFromFilename(filename)};base64,${b64}`,
+            src: makeBlobUrl(blob),
           });
         })
       );

@@ -419,71 +419,69 @@ function makeSkillPair(labelText, entry, key) {
 // ── PDF Export ─────────────────────────────────────────────────────────────
 
 async function renderCardCanvas(entry) {
-  const W = 600;
-  const H = 800;
-  const INFO_H = 180;
-  const IMG_H = H - INFO_H;
+  // Canvas sized at ~1.4:1 to match Override card proportions
+  const CANVAS_W = 1200;
+  const CANVAS_H = 857;
 
   const canvas = document.createElement('canvas');
-  canvas.width = W;
-  canvas.height = H;
+  canvas.width = CANVAS_W;
+  canvas.height = CANVAS_H;
   const ctx = canvas.getContext('2d');
 
-  // Dark background
-  ctx.fillStyle = '#120e06';
-  ctx.fillRect(0, 0, W, H);
+  ctx.fillStyle = '#e8e4dc';
+  ctx.fillRect(0, 0, CANVAS_W, CANVAS_H);
 
-  // Mech image — fit within image area maintaining aspect ratio
+  // Draw image contained within canvas
   const img = await loadImage(entry.src);
+  let ix = 0, iy = 0, iw = CANVAS_W, ih = CANVAS_H;
   if (img) {
-    const scale = Math.min(W / img.width, IMG_H / img.height);
-    const dw = img.width * scale;
-    const dh = img.height * scale;
-    ctx.drawImage(img, (W - dw) / 2, (IMG_H - dh) / 2, dw, dh);
+    const scale = Math.min(CANVAS_W / img.naturalWidth, CANVAS_H / img.naturalHeight);
+    iw = img.naturalWidth * scale;
+    ih = img.naturalHeight * scale;
+    ix = (CANVAS_W - iw) / 2;
+    iy = (CANVAS_H - ih) / 2;
+    ctx.drawImage(img, ix, iy, iw, ih);
   }
 
-  // Gradient fade into info bar
-  const grad = ctx.createLinearGradient(0, IMG_H - 100, 0, IMG_H);
-  grad.addColorStop(0, 'rgba(18,14,6,0)');
-  grad.addColorStop(1, 'rgba(18,14,6,1)');
-  ctx.fillStyle = grad;
-  ctx.fillRect(0, IMG_H - 100, W, 100);
+  // Overlay GUN and PIL numbers in the stat boxes.
+  // Positions are calibrated for the standard BattleTech Override card layout
+  // (Gunnery/Piloting boxes sit in the top-right of the card).
+  const boxW  = iw * 0.054;
+  const boxH  = ih * 0.065;
+  const boxY  = iy + ih * 0.030;
+  const gunX  = ix + iw * 0.528;
+  const pilX  = ix + iw * 0.616;
 
-  // Info bar
-  ctx.fillStyle = '#120e06';
-  ctx.fillRect(0, IMG_H, W, INFO_H);
+  function drawStatBox(x, y, value) {
+    ctx.fillStyle = 'rgba(255,255,255,0.92)';
+    ctx.strokeStyle = '#222';
+    ctx.lineWidth = 1.5;
+    ctx.fillRect(x, y, boxW, boxH);
+    ctx.strokeRect(x, y, boxW, boxH);
+    ctx.fillStyle = '#000';
+    ctx.font = `bold ${Math.round(boxH * 0.68)}px Arial, sans-serif`;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(String(value), x + boxW / 2, y + boxH / 2 + 1);
+  }
 
-  // Gold separator line
-  ctx.strokeStyle = '#8a6e28';
-  ctx.lineWidth = 2;
-  ctx.beginPath();
-  ctx.moveTo(20, IMG_H + 1);
-  ctx.lineTo(W - 20, IMG_H + 1);
-  ctx.stroke();
+  drawStatBox(gunX, boxY, entry.gunnery);
+  drawStatBox(pilX, boxY, entry.piloting);
 
-  // Mech name
-  ctx.fillStyle = '#c9a84c';
-  ctx.font = 'bold 34px "Courier New", monospace';
-  ctx.textAlign = 'center';
-  ctx.fillText(entry.name.toUpperCase(), W / 2, IMG_H + 50);
-
-  // Pilot name
-  ctx.fillStyle = '#d4c9a8';
-  ctx.font = '26px "Courier New", monospace';
-  ctx.fillText(entry.pilotName || '—', W / 2, IMG_H + 90);
-
-  // Skills
-  ctx.font = 'bold 30px "Courier New", monospace';
-  ctx.fillStyle = '#c9a84c';
-  ctx.textAlign = 'left';
-  ctx.fillText('GUN: ' + entry.gunnery, 40, IMG_H + 145);
-  ctx.textAlign = 'right';
-  ctx.fillText('PIL: ' + entry.piloting, W - 40, IMG_H + 145);
-
-  // Border
-  ctx.strokeStyle = '#8a6e28';
-  ctx.lineWidth = 4;
-  ctx.strokeRect(2, 2, W - 4, H - 4);
+  // Pilot name just below the stat boxes
+  if (entry.pilotName) {
+    const fontSize   = Math.round(ih * 0.038);
+    const nameY      = boxY + boxH + ih * 0.010;
+    const nameCenterX = (gunX + pilX + boxW) / 2;
+    ctx.font = `bold ${fontSize}px "Courier New", monospace`;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'top';
+    const tw = ctx.measureText(entry.pilotName).width;
+    ctx.fillStyle = 'rgba(10,8,4,0.70)';
+    ctx.fillRect(nameCenterX - tw / 2 - 6, nameY - 2, tw + 12, fontSize + 6);
+    ctx.fillStyle = '#fff';
+    ctx.fillText(entry.pilotName, nameCenterX, nameY);
+  }
 
   return canvas;
 }
@@ -499,29 +497,26 @@ async function exportPDF() {
   btn.textContent = 'Generating PDF…';
 
   try {
-    // Render all cards in parallel
     const canvases = await Promise.all(state.roster.map(renderCardCanvas));
 
     const { jsPDF } = window.jspdf;
+    // Portrait letter, 2 cards per page stacked — gives each card a ~1.48:1 slot
+    // which closely matches the Override card's landscape proportions
     const doc = new jsPDF({ unit: 'pt', format: 'letter', orientation: 'portrait' });
 
     const PAGE_W = 612;
     const PAGE_H = 792;
-    const MARGIN = 30;
-    const GAP = 10;
-    const COLS = 2;
+    const MARGIN = 24;
+    const GAP = 8;
     const ROWS = 2;
-    const CARD_W = (PAGE_W - MARGIN * 2 - GAP * (COLS - 1)) / COLS;
+    const CARD_W = PAGE_W - MARGIN * 2;
     const CARD_H = (PAGE_H - MARGIN * 2 - GAP * (ROWS - 1)) / ROWS;
 
     canvases.forEach((canvas, idx) => {
-      const pos = idx % (COLS * ROWS);
+      const pos = idx % ROWS;
       if (pos === 0 && idx > 0) doc.addPage();
-      const col = pos % COLS;
-      const row = Math.floor(pos / COLS);
-      const x = MARGIN + col * (CARD_W + GAP);
-      const y = MARGIN + row * (CARD_H + GAP);
-      doc.addImage(canvas, 'PNG', x, y, CARD_W, CARD_H, '', 'FAST');
+      const y = MARGIN + pos * (CARD_H + GAP);
+      doc.addImage(canvas, 'PNG', MARGIN, y, CARD_W, CARD_H, '', 'FAST');
     });
 
     doc.save('battletech-roster.pdf');

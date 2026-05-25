@@ -32,11 +32,19 @@
         <span class="panel-label">CATEGORIES</span>
         <div id="category-list"></div>
       </div>
+      <div id="search-bar">
+        <input type="text" id="search-input" placeholder="Search mechs…" autocomplete="off">
+      </div>
       <div id="mech-grid-container">
         <!-- Loading spinner shown while fetching manifest -->
         <div id="status-msg" class="loading-msg" style="display:none;"></div>
 
         <div id="mech-grid"></div>
+        <div id="pagination">
+          <button id="page-prev">&#8592;</button>
+          <span id="page-info"></span>
+          <button id="page-next">&#8594;</button>
+        </div>
 
         <!-- Shown when library is empty after manifest load -->
         <div id="empty-library" style="display:none;">

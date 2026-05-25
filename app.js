@@ -1,9 +1,13 @@
+const PAGE_SIZE = 48;
+
 const state = {
   library: {},
   roster: [],
   activeCategory: null,
   nextId: 1,
   blobUrls: new Set(),
+  search: '',
+  page: 0,
 };
 
 function makeBlobUrl(blob) {
@@ -205,6 +209,9 @@ function renderCategories() {
     btn.textContent = cat;
     btn.addEventListener('click', () => {
       state.activeCategory = cat;
+      state.page = 0;
+      state.search = '';
+      document.getElementById('search-input').value = '';
       renderCategories();
       renderGrid();
     });
@@ -212,20 +219,33 @@ function renderCategories() {
   });
 }
 
+function filteredMechs() {
+  const all = state.library[state.activeCategory] || [];
+  const term = state.search.trim().toLowerCase();
+  return term ? all.filter((m) => m.name.toLowerCase().includes(term)) : all;
+}
+
 function renderGrid() {
   const grid = document.getElementById('mech-grid');
   const empty = document.getElementById('empty-library');
+  const pagination = document.getElementById('pagination');
   grid.innerHTML = '';
 
-  const cats = Object.keys(state.library);
-  if (cats.length === 0) {
+  if (Object.keys(state.library).length === 0) {
     empty.style.display = 'block';
+    pagination.style.display = 'none';
     return;
   }
   empty.style.display = 'none';
 
-  const mechs = state.library[state.activeCategory] || [];
-  mechs.forEach((mech) => {
+  const mechs = filteredMechs();
+  const totalPages = Math.max(1, Math.ceil(mechs.length / PAGE_SIZE));
+  state.page = Math.min(state.page, totalPages - 1);
+
+  const start = state.page * PAGE_SIZE;
+  const slice = mechs.slice(start, start + PAGE_SIZE);
+
+  slice.forEach((mech) => {
     const thumb = document.createElement('div');
     thumb.className = 'mech-thumb';
 
@@ -243,6 +263,20 @@ function renderGrid() {
     thumb.addEventListener('click', () => addToRoster(mech, state.activeCategory));
     grid.appendChild(thumb);
   });
+
+  // Pagination controls
+  if (totalPages <= 1) {
+    pagination.style.display = 'none';
+  } else {
+    pagination.style.display = 'flex';
+    document.getElementById('page-info').textContent =
+      `${state.page + 1} / ${totalPages}  (${mechs.length} mechs)`;
+    document.getElementById('page-prev').disabled = state.page === 0;
+    document.getElementById('page-next').disabled = state.page >= totalPages - 1;
+  }
+
+  // Scroll grid back to top when page changes
+  grid.parentElement.scrollTop = 0;
 }
 
 // ── Roster ─────────────────────────────────────────────────────────────────
@@ -510,6 +544,21 @@ async function exportPDF() {
 }
 
 // ── Event listeners ────────────────────────────────────────────────────────
+
+document.getElementById('search-input').addEventListener('input', (e) => {
+  state.search = e.target.value;
+  state.page = 0;
+  renderGrid();
+});
+
+document.getElementById('page-prev').addEventListener('click', () => {
+  if (state.page > 0) { state.page--; renderGrid(); }
+});
+
+document.getElementById('page-next').addEventListener('click', () => {
+  state.page++;
+  renderGrid();
+});
 
 document.getElementById('zip-input').addEventListener('change', (e) => {
   if (e.target.files[0]) loadZip(e.target.files[0]);

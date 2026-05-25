@@ -411,14 +411,12 @@ main {
   padding: 12px;
   scrollbar-width: thin;
   scrollbar-color: var(--border) transparent;
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  display: flex;
+  flex-direction: column;
   gap: 12px;
-  align-content: start;
 }
 
 #empty-roster {
-  grid-column: 1 / -1;
   text-align: center;
   color: var(--text-dim);
   padding: 60px 20px;
@@ -428,6 +426,110 @@ main {
   font-size: 11px;
   color: #555;
   margin-top: 6px;
+}
+
+/* ── GROUP ACTIONS ── */
+.group-actions {
+  display: flex;
+  gap: 6px;
+}
+
+.btn-group {
+  padding: 4px 10px;
+  font-family: var(--font);
+  font-size: 11px;
+  font-weight: bold;
+  letter-spacing: 1px;
+  border-radius: var(--radius);
+  cursor: pointer;
+  border: 1px solid;
+  transition: background 0.12s, color 0.12s;
+  background: var(--olive-dk);
+  color: #9abf55;
+  border-color: var(--olive);
+}
+.btn-group:hover { background: var(--olive); }
+.btn-group.btn-star { background: #3a2a08; color: var(--gold); border-color: #6a4e18; }
+.btn-group.btn-star:hover { background: #4a3810; }
+
+.group-section {
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  overflow: hidden;
+}
+.group-section.active { border-color: var(--gold-dim); }
+
+.group-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 10px;
+  background: #191919;
+  cursor: pointer;
+  user-select: none;
+}
+.group-section.active .group-header { background: #1e1a0a; }
+
+.group-type-badge {
+  font-size: 9px;
+  font-weight: bold;
+  padding: 2px 6px;
+  border-radius: 3px;
+  letter-spacing: 1.5px;
+  flex-shrink: 0;
+  text-transform: uppercase;
+}
+.group-type-badge.lance { background: var(--olive-dk); color: #9abf55; }
+.group-type-badge.star  { background: #3a2a08; color: var(--gold); }
+
+.group-name-input {
+  flex: 1;
+  background: transparent;
+  border: none;
+  border-bottom: 1px solid transparent;
+  color: var(--tan);
+  font-family: var(--font);
+  font-size: 12px;
+  font-weight: bold;
+  outline: none;
+  letter-spacing: 0.5px;
+  min-width: 0;
+  transition: border-color 0.12s;
+}
+.group-name-input:focus { border-bottom-color: var(--gold-dim); }
+
+.group-count {
+  font-size: 10px;
+  color: var(--text-dim);
+  flex-shrink: 0;
+}
+.group-count.over { color: #cc4444; }
+
+.group-delete {
+  background: none;
+  border: none;
+  color: #664444;
+  font-size: 18px;
+  cursor: pointer;
+  padding: 0;
+  line-height: 1;
+  flex-shrink: 0;
+  transition: color 0.12s;
+}
+.group-delete:hover { color: #cc4444; }
+
+.group-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 10px;
+  padding: 10px;
+  background: var(--panel-r);
+}
+
+.ungrouped-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 12px;
 }
 
 /* ── ROSTER CARD ── */

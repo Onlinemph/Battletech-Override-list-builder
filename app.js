@@ -8,7 +8,11 @@ const state = {
   blobUrls: new Set(),
   search: '',
   page: 0,
+  groups: [],        // [{ id, name, type }] — type: 'lance' | 'star'
+  activeGroupId: null,
 };
+
+let groupIdCounter = 1;
 
 function makeBlobUrl(blob) {
   const url = URL.createObjectURL(blob);
@@ -286,6 +290,7 @@ function addToRoster(mech, category) {
     pilotName: '',
     gunnery: 4,
     piloting: 5,
+    groupId: state.activeGroupId,
   };
   state.roster.push(entry);
   renderRoster();
@@ -296,35 +301,100 @@ function removeFromRoster(id) {
   renderRoster();
 }
 
+function createGroup(type) {
+  const count = state.groups.filter(g => g.type === type).length;
+  const lanceNames = ['Alpha','Bravo','Charlie','Delta','Echo','Foxtrot'];
+  const starNames  = ['Alpha','Bravo','Charlie','Delta','Epsilon','Zeta'];
+  const prefix = (type === 'lance' ? lanceNames : starNames)[count] ?? `${count + 1}`;
+  const group = { id: groupIdCounter++, name: prefix + (type === 'lance' ? ' Lance' : ' Star'), type };
+  state.groups.push(group);
+  state.activeGroupId = group.id;
+  renderRoster();
+}
+
+function deleteGroup(id) {
+  state.groups = state.groups.filter(g => g.id !== id);
+  state.roster = state.roster.filter(e => e.groupId !== id);
+  if (state.activeGroupId === id) state.activeGroupId = state.groups.at(-1)?.id ?? null;
+  renderRoster();
+}
+
 function renderRoster() {
-  const list = document.getElementById('roster-list');
+  const list  = document.getElementById('roster-list');
   const empty = document.getElementById('empty-roster');
   const count = document.getElementById('roster-count');
 
   count.textContent = state.roster.length + ' mech' + (state.roster.length !== 1 ? 's' : '');
 
-  const existing = {};
-  list.querySelectorAll('.roster-card').forEach((el) => {
-    existing[el.dataset.id] = el;
-  });
-
-  const currentIds = new Set(state.roster.map((e) => String(e.id)));
-
-  Object.keys(existing).forEach((id) => {
-    if (!currentIds.has(id)) existing[id].remove();
-  });
-
-  if (state.roster.length === 0) {
+  if (state.roster.length === 0 && state.groups.length === 0) {
     empty.style.display = 'block';
+    list.querySelectorAll('.group-section, .ungrouped-cards').forEach(el => el.remove());
     return;
   }
   empty.style.display = 'none';
+  list.innerHTML = '';
 
-  state.roster.forEach((entry) => {
-    if (existing[entry.id]) return;
-    const card = buildCard(entry);
-    list.appendChild(card);
+  // Render each group section
+  state.groups.forEach(group => {
+    const mechs = state.roster.filter(e => e.groupId === group.id);
+    list.appendChild(buildGroupSection(group, mechs));
   });
+
+  // Render ungrouped mechs
+  const ungrouped = state.roster.filter(e => !e.groupId);
+  if (ungrouped.length > 0) {
+    const div = document.createElement('div');
+    div.className = 'ungrouped-cards';
+    ungrouped.forEach(entry => div.appendChild(buildCard(entry)));
+    list.appendChild(div);
+  }
+}
+
+function buildGroupSection(group, mechs) {
+  const maxMechs = group.type === 'lance' ? 4 : 5;
+  const isActive = group.id === state.activeGroupId;
+
+  const section = document.createElement('div');
+  section.className = 'group-section' + (isActive ? ' active' : '');
+  section.dataset.id = group.id;
+
+  const header = document.createElement('div');
+  header.className = 'group-header';
+  header.title = 'Click to make active — new mechs go here';
+  header.addEventListener('click', e => {
+    if (e.target.closest('.group-delete')) return;
+    state.activeGroupId = group.id;
+    renderRoster();
+  });
+
+  const badge = document.createElement('span');
+  badge.className = 'group-type-badge ' + group.type;
+  badge.textContent = group.type.toUpperCase();
+
+  const nameInput = document.createElement('input');
+  nameInput.className = 'group-name-input';
+  nameInput.value = group.name;
+  nameInput.addEventListener('click', e => e.stopPropagation());
+  nameInput.addEventListener('input', e => { group.name = e.target.value; });
+
+  const countSpan = document.createElement('span');
+  countSpan.className = 'group-count' + (mechs.length > maxMechs ? ' over' : '');
+  countSpan.textContent = `${mechs.length}/${maxMechs}`;
+
+  const deleteBtn = document.createElement('button');
+  deleteBtn.className = 'group-delete';
+  deleteBtn.textContent = '×';
+  deleteBtn.title = 'Delete group and its mechs';
+  deleteBtn.addEventListener('click', () => deleteGroup(group.id));
+
+  header.append(badge, nameInput, countSpan, deleteBtn);
+
+  const cards = document.createElement('div');
+  cards.className = 'group-cards';
+  mechs.forEach(entry => cards.appendChild(buildCard(entry)));
+
+  section.append(header, cards);
+  return section;
 }
 
 function buildCard(entry) {
@@ -483,6 +553,23 @@ async function renderCardCanvas(entry) {
     ctx.fillText(entry.pilotName, nameCenterX, nameY);
   }
 
+  // Group label — bottom-left of image
+  const group = state.groups.find(g => g.id === entry.groupId);
+  if (group) {
+    const labelText  = group.name.toUpperCase();
+    const labelSize  = Math.round(ih * 0.038);
+    ctx.font = `bold ${labelSize}px "Courier New", monospace`;
+    ctx.textAlign    = 'left';
+    ctx.textBaseline = 'bottom';
+    const lw = ctx.measureText(labelText).width;
+    const lx = ix + iw * 0.02;
+    const ly = iy + ih * 0.97;
+    ctx.fillStyle = group.type === 'lance' ? 'rgba(35,50,15,0.82)' : 'rgba(55,40,8,0.82)';
+    ctx.fillRect(lx - 5, ly - labelSize - 3, lw + 10, labelSize + 8);
+    ctx.fillStyle = group.type === 'lance' ? '#9abf55' : '#c9a84c';
+    ctx.fillText(labelText, lx, ly);
+  }
+
   return canvas;
 }
 
@@ -497,7 +584,11 @@ async function exportPDF() {
   btn.textContent = 'Generating PDF…';
 
   try {
-    const canvases = await Promise.all(state.roster.map(renderCardCanvas));
+    const ordered = [
+      ...state.groups.flatMap(g => state.roster.filter(e => e.groupId === g.id)),
+      ...state.roster.filter(e => !e.groupId),
+    ];
+    const canvases = await Promise.all(ordered.map(renderCardCanvas));
 
     const { jsPDF } = window.jspdf;
     // Portrait letter, 2 cards per page stacked — gives each card a ~1.48:1 slot
@@ -554,6 +645,9 @@ document.getElementById('folder-input').addEventListener('change', (e) => {
 });
 
 document.getElementById('export-btn').addEventListener('click', exportPDF);
+
+document.getElementById('new-lance-btn').addEventListener('click', () => createGroup('lance'));
+document.getElementById('new-star-btn').addEventListener('click', () => createGroup('star'));
 
 // ── Boot ───────────────────────────────────────────────────────────────────
 

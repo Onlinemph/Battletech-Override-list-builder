@@ -46,16 +46,12 @@ function mimeFromFilename(filename) {
   return { png: 'image/png', jpg: 'image/jpeg', jpeg: 'image/jpeg', webp: 'image/webp' }[ext] || 'image/png';
 }
 
-async function srcToDataUrl(src) {
-  if (src.startsWith('data:')) return src;
-  const resp = await fetch(src);
-  if (!resp.ok) throw new Error(`Failed to fetch ${src}: ${resp.status}`);
-  const blob = await resp.blob();
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = (e) => resolve(e.target.result);
-    reader.onerror = reject;
-    reader.readAsDataURL(blob);
+function loadImage(src) {
+  return new Promise((resolve) => {
+    const img = new Image();
+    img.onload = () => resolve(img);
+    img.onerror = () => resolve(null);
+    img.src = src;
   });
 }
 
@@ -422,6 +418,76 @@ function makeSkillPair(labelText, entry, key) {
 
 // ── PDF Export ─────────────────────────────────────────────────────────────
 
+async function renderCardCanvas(entry) {
+  const W = 600;
+  const H = 800;
+  const INFO_H = 180;
+  const IMG_H = H - INFO_H;
+
+  const canvas = document.createElement('canvas');
+  canvas.width = W;
+  canvas.height = H;
+  const ctx = canvas.getContext('2d');
+
+  // Dark background
+  ctx.fillStyle = '#120e06';
+  ctx.fillRect(0, 0, W, H);
+
+  // Mech image — fit within image area maintaining aspect ratio
+  const img = await loadImage(entry.src);
+  if (img) {
+    const scale = Math.min(W / img.width, IMG_H / img.height);
+    const dw = img.width * scale;
+    const dh = img.height * scale;
+    ctx.drawImage(img, (W - dw) / 2, (IMG_H - dh) / 2, dw, dh);
+  }
+
+  // Gradient fade into info bar
+  const grad = ctx.createLinearGradient(0, IMG_H - 100, 0, IMG_H);
+  grad.addColorStop(0, 'rgba(18,14,6,0)');
+  grad.addColorStop(1, 'rgba(18,14,6,1)');
+  ctx.fillStyle = grad;
+  ctx.fillRect(0, IMG_H - 100, W, 100);
+
+  // Info bar
+  ctx.fillStyle = '#120e06';
+  ctx.fillRect(0, IMG_H, W, INFO_H);
+
+  // Gold separator line
+  ctx.strokeStyle = '#8a6e28';
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.moveTo(20, IMG_H + 1);
+  ctx.lineTo(W - 20, IMG_H + 1);
+  ctx.stroke();
+
+  // Mech name
+  ctx.fillStyle = '#c9a84c';
+  ctx.font = 'bold 34px "Courier New", monospace';
+  ctx.textAlign = 'center';
+  ctx.fillText(entry.name.toUpperCase(), W / 2, IMG_H + 50);
+
+  // Pilot name
+  ctx.fillStyle = '#d4c9a8';
+  ctx.font = '26px "Courier New", monospace';
+  ctx.fillText(entry.pilotName || '—', W / 2, IMG_H + 90);
+
+  // Skills
+  ctx.font = 'bold 30px "Courier New", monospace';
+  ctx.fillStyle = '#c9a84c';
+  ctx.textAlign = 'left';
+  ctx.fillText('GUN: ' + entry.gunnery, 40, IMG_H + 145);
+  ctx.textAlign = 'right';
+  ctx.fillText('PIL: ' + entry.piloting, W - 40, IMG_H + 145);
+
+  // Border
+  ctx.strokeStyle = '#8a6e28';
+  ctx.lineWidth = 4;
+  ctx.strokeRect(2, 2, W - 4, H - 4);
+
+  return canvas;
+}
+
 async function exportPDF() {
   if (state.roster.length === 0) {
     alert('Roster is empty — add some mechs first.');
@@ -433,107 +499,29 @@ async function exportPDF() {
   btn.textContent = 'Generating PDF…';
 
   try {
-    // Pre-fetch all images to data URLs
-    const dataUrls = await Promise.all(
-      state.roster.map((entry) => srcToDataUrl(entry.src).catch(() => null))
-    );
+    // Render all cards in parallel
+    const canvases = await Promise.all(state.roster.map(renderCardCanvas));
 
     const { jsPDF } = window.jspdf;
     const doc = new jsPDF({ unit: 'pt', format: 'letter', orientation: 'portrait' });
 
     const PAGE_W = 612;
     const PAGE_H = 792;
-    const MARGIN = 36;
-    const GAP = 6;
-    const COLS = 3;
-    const ROWS = 3;
-
+    const MARGIN = 30;
+    const GAP = 10;
+    const COLS = 2;
+    const ROWS = 2;
     const CARD_W = (PAGE_W - MARGIN * 2 - GAP * (COLS - 1)) / COLS;
     const CARD_H = (PAGE_H - MARGIN * 2 - GAP * (ROWS - 1)) / ROWS;
 
-    const HEADER_H = 22;
-    const INFO_H = 54;
-    const IMG_H = CARD_H - HEADER_H - INFO_H;
-
-    const BROWN = [59, 34, 8];
-    const GOLD_TEXT = [201, 168, 76];
-    const TAN_BG = [212, 201, 168];
-    const BORDER_COLOR = [90, 73, 40];
-    const DARK_INFO = [30, 30, 30];
-    const TAN_TEXT = [168, 159, 130];
-    const DIM_TEXT = [120, 110, 90];
-
-    state.roster.forEach((entry, idx) => {
+    canvases.forEach((canvas, idx) => {
       const pos = idx % (COLS * ROWS);
+      if (pos === 0 && idx > 0) doc.addPage();
       const col = pos % COLS;
       const row = Math.floor(pos / COLS);
-
-      if (pos === 0 && idx > 0) doc.addPage();
-
       const x = MARGIN + col * (CARD_W + GAP);
       const y = MARGIN + row * (CARD_H + GAP);
-
-      doc.setFillColor(...TAN_BG);
-      doc.roundedRect(x, y, CARD_W, CARD_H, 4, 4, 'F');
-
-      doc.setDrawColor(...BORDER_COLOR);
-      doc.setLineWidth(1);
-      doc.roundedRect(x, y, CARD_W, CARD_H, 4, 4, 'S');
-
-      doc.setFillColor(...BROWN);
-      doc.roundedRect(x, y, CARD_W, HEADER_H, 4, 4, 'F');
-      doc.setFillColor(...BROWN);
-      doc.rect(x, y + HEADER_H - 4, CARD_W, 4, 'F');
-
-      doc.setFont('helvetica', 'bold');
-      doc.setFontSize(9);
-      doc.setTextColor(...GOLD_TEXT);
-      const mechLabel = entry.name.toUpperCase();
-      const labelW = doc.getTextWidth(mechLabel);
-      const maxW = CARD_W - 10;
-      if (labelW > maxW) {
-        doc.setFontSize(7);
-      }
-      doc.text(mechLabel, x + CARD_W / 2, y + HEADER_H - 7, { align: 'center' });
-      doc.setFontSize(9);
-
-      const dataUrl = dataUrls[idx];
-      if (dataUrl) {
-        try {
-          const fmt = dataUrl.split(';')[0].split('/')[1].toUpperCase();
-          const safeFormat = ['PNG', 'JPEG', 'JPG', 'WEBP'].includes(fmt) ? fmt : 'PNG';
-          doc.addImage(dataUrl, safeFormat, x + 2, y + HEADER_H, CARD_W - 4, IMG_H, undefined, 'FAST');
-        } catch (e) {
-          doc.setFillColor(30, 30, 30);
-          doc.rect(x + 2, y + HEADER_H, CARD_W - 4, IMG_H, 'F');
-        }
-      } else {
-        doc.setFillColor(30, 30, 30);
-        doc.rect(x + 2, y + HEADER_H, CARD_W - 4, IMG_H, 'F');
-      }
-
-      const infoY = y + HEADER_H + IMG_H;
-      doc.setFillColor(...DARK_INFO);
-      doc.rect(x, infoY, CARD_W, INFO_H, 'F');
-      doc.setFillColor(...BORDER_COLOR);
-      doc.rect(x, infoY, CARD_W, 1, 'F');
-
-      doc.setFont('courier', 'bold');
-      doc.setFontSize(8);
-      doc.setTextColor(...TAN_TEXT);
-      const pilotDisplay = entry.pilotName || '—';
-      doc.text('PILOT: ' + pilotDisplay, x + 6, infoY + 13);
-
-      doc.setFont('courier', 'bold');
-      doc.setFontSize(9);
-      doc.setTextColor(...GOLD_TEXT);
-      doc.text('GUN: ' + entry.gunnery, x + 6, infoY + 28);
-      doc.text('PIL: ' + entry.piloting, x + CARD_W / 2 + 2, infoY + 28);
-
-      doc.setFont('courier', 'italic');
-      doc.setFontSize(7);
-      doc.setTextColor(...DIM_TEXT);
-      doc.text(entry.category, x + CARD_W - 6, infoY + INFO_H - 7, { align: 'right' });
+      doc.addImage(canvas, 'PNG', x, y, CARD_W, CARD_H, '', 'FAST');
     });
 
     doc.save('battletech-roster.pdf');

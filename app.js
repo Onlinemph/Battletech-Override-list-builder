@@ -591,23 +591,27 @@ async function exportPDF() {
     const canvases = await Promise.all(ordered.map(renderCardCanvas));
 
     const { jsPDF } = window.jspdf;
-    // Portrait letter, 2 cards per page stacked — gives each card a ~1.48:1 slot
-    // which closely matches the Override card's landscape proportions
-    const doc = new jsPDF({ unit: 'pt', format: 'letter', orientation: 'portrait' });
+    // Landscape letter, 2×2 grid — each slot is ~368×278pt (1.32:1),
+    // closely matching Override card proportions. 4 cards per page.
+    const doc = new jsPDF({ unit: 'pt', format: 'letter', orientation: 'landscape' });
 
-    const PAGE_W = 612;
-    const PAGE_H = 792;
+    const PAGE_W = 792;
+    const PAGE_H = 612;
     const MARGIN = 24;
     const GAP = 8;
+    const COLS = 2;
     const ROWS = 2;
-    const CARD_W = PAGE_W - MARGIN * 2;
+    const CARD_W = (PAGE_W - MARGIN * 2 - GAP * (COLS - 1)) / COLS;
     const CARD_H = (PAGE_H - MARGIN * 2 - GAP * (ROWS - 1)) / ROWS;
 
     canvases.forEach((canvas, idx) => {
-      const pos = idx % ROWS;
+      const pos = idx % (COLS * ROWS);
       if (pos === 0 && idx > 0) doc.addPage();
-      const y = MARGIN + pos * (CARD_H + GAP);
-      doc.addImage(canvas, 'PNG', MARGIN, y, CARD_W, CARD_H, '', 'FAST');
+      const col = pos % COLS;
+      const row = Math.floor(pos / COLS);
+      const x = MARGIN + col * (CARD_W + GAP);
+      const y = MARGIN + row * (CARD_H + GAP);
+      doc.addImage(canvas, 'PNG', x, y, CARD_W, CARD_H, '', 'FAST');
     });
 
     doc.save('battletech-roster.pdf');

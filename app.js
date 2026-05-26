@@ -326,13 +326,14 @@ function renderRoster() {
 
   count.textContent = state.roster.length + ' mech' + (state.roster.length !== 1 ? 's' : '');
 
+  // Remove only dynamic children — leave #empty-roster in the DOM
+  list.querySelectorAll('.group-section, .ungrouped-cards').forEach(el => el.remove());
+
   if (state.roster.length === 0 && state.groups.length === 0) {
     empty.style.display = 'block';
-    list.querySelectorAll('.group-section, .ungrouped-cards').forEach(el => el.remove());
     return;
   }
   empty.style.display = 'none';
-  list.innerHTML = '';
 
   // Render each group section
   state.groups.forEach(group => {

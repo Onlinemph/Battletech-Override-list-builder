@@ -45,11 +45,6 @@ function categoryFromZipPath(relPath) {
   return parts[1]; // 3+ levels: skip root folder (e.g. "images/")
 }
 
-function mimeFromFilename(filename) {
-  const ext = filename.split('.').pop().toLowerCase();
-  return { png: 'image/png', jpg: 'image/jpeg', jpeg: 'image/jpeg', webp: 'image/webp' }[ext] || 'image/png';
-}
-
 function loadImage(src) {
   return new Promise((resolve) => {
     const img = new Image();
@@ -59,7 +54,20 @@ function loadImage(src) {
   });
 }
 
-// ── Manifest / init ────────────────────────────────────────────────────────
+// ── Library loading ──────────────────────────────────────────────────────────
+
+// Sort each category, select the first as active, and refresh the UI.
+// Shared by every loader (manifest, local folder, zip).
+function finalizeLibrary() {
+  for (const cat of Object.keys(state.library)) {
+    state.library[cat].sort((a, b) => a.name.localeCompare(b.name));
+  }
+  const cats = Object.keys(state.library).sort();
+  state.activeCategory = cats[0] || null;
+  hideStatusMsg();
+  renderCategories();
+  renderGrid();
+}
 
 async function init() {
   showLoadingMsg('Loading image library…');
@@ -87,14 +95,9 @@ function loadFromManifest(manifest) {
       .map((f) => ({
         name: nameFromFile(f),
         src: `images/${cat}/${f}`,
-      }))
-      .sort((a, b) => a.name.localeCompare(b.name));
+      }));
   }
-  const cats = Object.keys(state.library).sort();
-  state.activeCategory = cats[0] || null;
-  hideStatusMsg();
-  renderCategories();
-  renderGrid();
+  finalizeLibrary();
 }
 
 // ── Local folder fallback ──────────────────────────────────────────────────
@@ -113,14 +116,7 @@ function loadLocalLibrary(files) {
     });
   }
 
-  for (const cat of Object.keys(state.library)) {
-    state.library[cat].sort((a, b) => a.name.localeCompare(b.name));
-  }
-  const cats = Object.keys(state.library).sort();
-  state.activeCategory = cats[0] || null;
-  hideStatusMsg();
-  renderCategories();
-  renderGrid();
+  finalizeLibrary();
 }
 
 // ── Zip loader ─────────────────────────────────────────────────────────────
@@ -151,15 +147,7 @@ async function loadZip(file) {
     });
 
     await Promise.all(tasks);
-
-    for (const cat of Object.keys(state.library)) {
-      state.library[cat].sort((a, b) => a.name.localeCompare(b.name));
-    }
-    const cats = Object.keys(state.library).sort();
-    state.activeCategory = cats[0] || null;
-    hideStatusMsg();
-    renderCategories();
-    renderGrid();
+    finalizeLibrary();
   } catch (err) {
     hideStatusMsg();
     alert('Failed to load zip: ' + err.message);

@@ -11,7 +11,7 @@
 <body>
   <header>
     <div class="header-inner">
-      <h1>BATTLETECH ROSTER BUILDER <span class="version">v0.1.0</span></h1>
+      <h1>BATTLETECH ROSTER BUILDER <span class="version">v0.2.0</span></h1>
       <div class="header-actions">
         <label class="btn btn-primary" for="zip-input" title="Load a zip of mech images">
           Load zip
@@ -20,6 +20,10 @@
         <label class="btn btn-secondary" for="folder-input" title="Load images from a local folder">
           Load folder
           <input type="file" id="folder-input" webkitdirectory accept=".png,.jpg,.jpeg,.webp" multiple>
+        </label>
+        <label class="btn btn-secondary" for="bv-input" title="Load a BV table (CSV or JSON: name,BV) to auto-fill base BV">
+          Load BV table
+          <input type="file" id="bv-input" accept=".csv,.json,.txt">
         </label>
         <button class="btn btn-export" id="export-btn">Export PDF</button>
       </div>
@@ -65,6 +69,7 @@
       <div class="roster-header">
         <span class="panel-label">ROSTER</span>
         <span id="roster-count">0 mechs</span>
+        <span id="roster-bv-total" title="Total skill-adjusted Battle Value">BV 0</span>
         <div class="group-actions">
           <button class="btn-group" id="new-lance-btn">+ Lance</button>
           <button class="btn-group btn-star" id="new-star-btn">+ Star</button>

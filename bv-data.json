@@ -1,0 +1,23 @@
+{
+  "_comment": "Unit name -> base Battle Value (BV2). Keys are matched against card filenames after normalization (uppercase, punctuation/spaces removed), so 'Atlas AS7-D', 'ATLAS AS7D' and 'atlas-as7-d' all match the same entry. This starter set is small; load a full table via the 'Load BV table' button (CSV or JSON exported from the Master Unit List). Verify these example values against your own source.",
+  "Atlas AS7-D": 1897,
+  "Atlas AS7-K": 1965,
+  "BattleMaster BLR-1G": 1519,
+  "Marauder MAD-3R": 1363,
+  "Warhammer WHM-6R": 1290,
+  "Rifleman RFL-3N": 1009,
+  "Catapult CPLT-C1": 1399,
+  "Zeus ZEU-6S": 1495,
+  "Thunderbolt TDR-5S": 1335,
+  "Wolverine WVR-6R": 1101,
+  "Shadow Hawk SHD-2H": 1018,
+  "Phoenix Hawk PXH-1": 1086,
+  "Locust LCT-1V": 432,
+  "Commando COM-2D": 519,
+  "Jenner JR7-D": 875,
+  "Centurion CN9-A": 924,
+  "Hunchback HBK-4G": 1041,
+  "Wasp WSP-1A": 422,
+  "Stinger STG-3R": 416,
+  "Griffin GRF-1N": 1272
+}

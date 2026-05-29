@@ -399,11 +399,23 @@ main {
   flex-shrink: 0;
 }
 
+.roster-header { gap: 12px; }
+
 #roster-count {
   font-size: 11px;
   color: var(--text-dim);
   letter-spacing: 1px;
 }
+
+#roster-bv-total {
+  font-size: 12px;
+  font-weight: bold;
+  color: var(--gold);
+  letter-spacing: 1px;
+}
+
+/* push the group buttons to the far right */
+.group-actions { margin-left: auto; }
 
 #roster-list {
   flex: 1;
@@ -501,6 +513,13 @@ main {
 .group-count {
   font-size: 10px;
   color: var(--text-dim);
+  flex-shrink: 0;
+}
+
+.group-bv {
+  font-size: 10px;
+  font-weight: bold;
+  color: var(--gold);
   flex-shrink: 0;
 }
 
@@ -674,6 +693,41 @@ main {
 }
 .skill-pair input[type="number"]:focus {
   border-color: var(--gold-dim);
+}
+
+.card-bv {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+}
+.card-bv label {
+  color: var(--text-dim);
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+.card-bv input[type="number"] {
+  width: 64px;
+  background: #111;
+  border: 1px solid #333;
+  border-radius: 3px;
+  color: var(--tan);
+  font-family: var(--font);
+  font-size: 11px;
+  padding: 3px 4px;
+  text-align: center;
+  outline: none;
+  transition: border-color 0.12s;
+}
+.card-bv input[type="number"]:focus {
+  border-color: var(--gold-dim);
+}
+.card-bv-adjusted {
+  color: var(--gold);
+  font-weight: 700;
+  font-size: 11px;
+  letter-spacing: 0.5px;
 }
 
 .card-category {

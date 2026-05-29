@@ -47,6 +47,30 @@ Open `index.html` in a browser via a local server (e.g. `python -m http.server`)
 
 > Note: the folder picker requires a local server or browser that supports `file://` with `webkitdirectory`. Most modern browsers work fine over `localhost`.
 
+## Battle Value (BV)
+
+Each roster card has a **base BV** field and shows the **skill-adjusted BV**, calculated from the pilot's Gunnery/Piloting using the official BV2 skill multiplier table (TechManual p.315). Per-group subtotals and a grand total appear in the roster header, and the adjusted BV is printed on each PDF card.
+
+Base BV is auto-filled by matching the card's filename against a BV table. Matching is forgiving — it ignores case, punctuation, and leading collection tags (so `BTD Atlas AS7-D.png` still matches `Atlas AS7-D`).
+
+### Loading a BV table
+
+The bundled `bv-data.json` contains only a small starter set. For full coverage, click **Load BV table** and select a file in either format:
+
+- **JSON** — an object mapping unit name to base BV:
+  ```json
+  { "Atlas AS7-D": 1897, "Marauder MAD-3R": 1363 }
+  ```
+- **CSV** — one unit per line, BV in the last column (a header row is fine):
+  ```
+  Atlas AS7-D,1897
+  Marauder MAD-3R,1363
+  ```
+
+You can export such a list from the [Master Unit List](https://masterunitlist.info). To make matches permanent for everyone, paste your entries into `bv-data.json` and commit it.
+
+If a card doesn't match, just type its base BV into the card's BV field — manual values are never overwritten by a later table import.
+
 ## PDF export
 
-Click **Export PDF** to download a print-ready PDF of your current roster (3×3 cards per page, letter size).
+Click **Export PDF** to download a print-ready PDF of your current roster (landscape, 2×2 cards per page, letter size).

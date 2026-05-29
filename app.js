@@ -10,7 +10,59 @@ const state = {
   page: 0,
   groups: [],        // [{ id, name, type }] — type: 'lance' | 'star'
   activeGroupId: null,
+  bvIndex: {},       // normalized unit name -> base BV
 };
+
+// Official BV2 skill multiplier table (TechManual p.315), indexed
+// [gunnery][piloting], both 0–8. Verified against MegaMek's unit tests
+// (4/5 → 1.00, 3/4 → 1.32, 5/6 → 0.86, 0/0 → 2.42).
+const BV_SKILL_MULT = [
+  [2.42, 2.31, 2.21, 2.10, 1.93, 1.75, 1.68, 1.59, 1.50],
+  [2.21, 2.11, 2.02, 1.92, 1.76, 1.60, 1.54, 1.46, 1.38],
+  [1.93, 1.85, 1.76, 1.68, 1.54, 1.40, 1.35, 1.28, 1.21],
+  [1.66, 1.58, 1.51, 1.44, 1.32, 1.20, 1.16, 1.10, 1.04],
+  [1.38, 1.32, 1.26, 1.20, 1.10, 1.00, 0.95, 0.90, 0.85],
+  [1.31, 1.19, 1.13, 1.08, 0.99, 0.90, 0.86, 0.81, 0.77],
+  [1.24, 1.12, 1.07, 1.02, 0.94, 0.85, 0.81, 0.77, 0.72],
+  [1.17, 1.06, 1.01, 0.96, 0.88, 0.80, 0.76, 0.72, 0.68],
+  [1.10, 0.99, 0.95, 0.90, 0.83, 0.75, 0.71, 0.68, 0.64],
+];
+
+function bvSkillMultiplier(gunnery, piloting) {
+  const g = Math.max(0, Math.min(8, gunnery | 0));
+  const p = Math.max(0, Math.min(8, piloting | 0));
+  return BV_SKILL_MULT[g][p];
+}
+
+// Skill-adjusted BV for a roster entry, or null if no base BV is set.
+function entryAdjustedBV(entry) {
+  if (entry.baseBV == null) return null;
+  return Math.round(entry.baseBV * bvSkillMultiplier(entry.gunnery, entry.piloting));
+}
+
+function normalizeUnitName(s) {
+  return s.toUpperCase().replace(/[^A-Z0-9]/g, '');
+}
+
+// Look up base BV by name. Tries the full name, then drops leading tokens
+// one at a time so collection prefixes (e.g. "BTD Atlas AS7-D") still match.
+function lookupBV(name) {
+  const tokens = name.trim().split(/\s+/);
+  for (let i = 0; i < tokens.length; i++) {
+    const bv = state.bvIndex[normalizeUnitName(tokens.slice(i).join(''))];
+    if (bv != null) return bv;
+  }
+  return null;
+}
+
+// Merge a { name: bv } map into the lookup index (normalizing keys).
+function mergeBVData(data) {
+  for (const [name, bv] of Object.entries(data)) {
+    if (name.startsWith('_')) continue;          // skip _comment etc.
+    const n = parseInt(bv, 10);
+    if (!isNaN(n)) state.bvIndex[normalizeUnitName(name)] = n;
+  }
+}
 
 let groupIdCounter = 1;
 
@@ -279,6 +331,8 @@ function addToRoster(mech, category) {
     gunnery: 4,
     piloting: 5,
     groupId: state.activeGroupId,
+    baseBV: lookupBV(mech.name),
+    bvManual: false,
   };
   state.roster.push(entry);
   renderRoster();
@@ -305,6 +359,22 @@ function deleteGroup(id) {
   state.roster = state.roster.filter(e => e.groupId !== id);
   if (state.activeGroupId === id) state.activeGroupId = state.groups.at(-1)?.id ?? null;
   renderRoster();
+}
+
+function groupAdjustedTotal(groupId) {
+  return state.roster
+    .filter((e) => e.groupId === groupId)
+    .reduce((sum, e) => sum + (entryAdjustedBV(e) || 0), 0);
+}
+
+// Refresh the grand-total and per-group BV readouts in place (no full re-render).
+function updateTotals() {
+  const grand = state.roster.reduce((sum, e) => sum + (entryAdjustedBV(e) || 0), 0);
+  document.getElementById('roster-bv-total').textContent = 'BV ' + grand.toLocaleString();
+  state.groups.forEach((g) => {
+    const el = document.querySelector(`.group-bv[data-group-id="${g.id}"]`);
+    if (el) el.textContent = 'BV ' + groupAdjustedTotal(g.id).toLocaleString();
+  });
 }
 
 function renderRoster() {
@@ -337,6 +407,8 @@ function renderRoster() {
     ungrouped.forEach(entry => div.appendChild(buildCard(entry)));
     list.appendChild(div);
   }
+
+  updateTotals();
 }
 
 function buildGroupSection(group, mechs) {
@@ -369,13 +441,18 @@ function buildGroupSection(group, mechs) {
   countSpan.className = 'group-count';
   countSpan.textContent = mechs.length;
 
+  const bvSpan = document.createElement('span');
+  bvSpan.className = 'group-bv';
+  bvSpan.dataset.groupId = group.id;
+  bvSpan.title = 'Skill-adjusted BV for this group';
+
   const deleteBtn = document.createElement('button');
   deleteBtn.className = 'group-delete';
   deleteBtn.textContent = '×';
   deleteBtn.title = 'Delete group and its mechs';
   deleteBtn.addEventListener('click', () => deleteGroup(group.id));
 
-  header.append(badge, nameInput, countSpan, deleteBtn);
+  header.append(badge, nameInput, countSpan, bvSpan, deleteBtn);
 
   const cards = document.createElement('div');
   cards.className = 'group-cards';
@@ -428,11 +505,44 @@ function buildCard(entry) {
   pilotField.appendChild(pilotLabel);
   pilotField.appendChild(pilotInput);
 
+  // BV row: editable base BV + computed skill-adjusted BV
+  const bvRow = document.createElement('div');
+  bvRow.className = 'card-bv';
+
+  const bvLabel = document.createElement('label');
+  bvLabel.textContent = 'BV';
+
+  const bvInput = document.createElement('input');
+  bvInput.type = 'number';
+  bvInput.min = 0;
+  bvInput.placeholder = '—';
+  bvInput.title = 'Base Battle Value';
+  if (entry.baseBV != null) bvInput.value = entry.baseBV;
+
+  const adjustedSpan = document.createElement('span');
+  adjustedSpan.className = 'card-bv-adjusted';
+
+  const refreshBV = () => {
+    const adj = entryAdjustedBV(entry);
+    adjustedSpan.textContent = adj != null ? '= ' + adj.toLocaleString() : '';
+    updateTotals();
+  };
+
+  bvInput.addEventListener('input', (e) => {
+    const v = parseInt(e.target.value, 10);
+    entry.baseBV = isNaN(v) ? null : v;
+    entry.bvManual = true;
+    refreshBV();
+  });
+
+  bvRow.append(bvLabel, bvInput, adjustedSpan);
+  refreshBV();
+
   const skillsRow = document.createElement('div');
   skillsRow.className = 'card-skills';
 
-  skillsRow.appendChild(makeSkillPair('GUN', entry, 'gunnery'));
-  skillsRow.appendChild(makeSkillPair('PIL', entry, 'piloting'));
+  skillsRow.appendChild(makeSkillPair('GUN', entry, 'gunnery', refreshBV));
+  skillsRow.appendChild(makeSkillPair('PIL', entry, 'piloting', refreshBV));
 
   const catTag = document.createElement('div');
   catTag.className = 'card-category';
@@ -440,6 +550,7 @@ function buildCard(entry) {
 
   info.appendChild(pilotField);
   info.appendChild(skillsRow);
+  info.appendChild(bvRow);
   info.appendChild(catTag);
 
   card.appendChild(header);
@@ -449,7 +560,7 @@ function buildCard(entry) {
   return card;
 }
 
-function makeSkillPair(labelText, entry, key) {
+function makeSkillPair(labelText, entry, key, onChange) {
   const wrap = document.createElement('div');
   wrap.className = 'skill-pair';
 
@@ -467,6 +578,7 @@ function makeSkillPair(labelText, entry, key) {
     v = Math.max(0, Math.min(8, v));
     entry[key] = v;
     e.target.value = v;
+    if (onChange) onChange();
   });
 
   wrap.appendChild(lbl);
@@ -541,6 +653,23 @@ async function renderCardCanvas(entry) {
     ctx.fillText(entry.pilotName, nameCenterX, nameY);
   }
 
+  // Adjusted BV — top-left of image
+  const adjBV = entryAdjustedBV(entry);
+  if (adjBV != null) {
+    const bvText = 'BV ' + adjBV.toLocaleString();
+    const bvSize = Math.round(ih * 0.040);
+    ctx.font = `bold ${bvSize}px "Courier New", monospace`;
+    ctx.textAlign = 'left';
+    ctx.textBaseline = 'top';
+    const bw = ctx.measureText(bvText).width;
+    const bx = ix + iw * 0.02;
+    const by = iy + ih * 0.02;
+    ctx.fillStyle = 'rgba(10,8,4,0.78)';
+    ctx.fillRect(bx - 5, by - 3, bw + 10, bvSize + 8);
+    ctx.fillStyle = '#c9a84c';
+    ctx.fillText(bvText, bx, by);
+  }
+
   // Group label — bottom-left of image
   const group = state.groups.find(g => g.id === entry.groupId);
   if (group) {
@@ -609,6 +738,56 @@ async function exportPDF() {
   }
 }
 
+// ── Battle Value data ────────────────────────────────────────────────────────
+
+async function loadBVData() {
+  try {
+    const resp = await fetch('bv-data.json');
+    if (resp.ok) mergeBVData(await resp.json());
+  } catch (e) {
+    // No bundled table — that's fine; user can import one or enter BV manually.
+  }
+}
+
+// Accepts a { name: bv } JSON object or CSV with a name column and a BV column.
+function parseBVTable(text, filename) {
+  text = text.trim();
+  if (filename.toLowerCase().endsWith('.json') || text.startsWith('{')) {
+    return JSON.parse(text);
+  }
+  const out = {};
+  for (const line of text.split(/\r?\n/)) {
+    if (!line.trim()) continue;
+    const idx = line.lastIndexOf(',');        // BV is the last comma-separated field
+    if (idx < 0) continue;
+    const name = line.slice(0, idx).trim().replace(/^"|"$/g, '');
+    const bv = parseInt(line.slice(idx + 1).trim(), 10);
+    if (name && !isNaN(bv)) out[name] = bv;
+  }
+  return out;
+}
+
+async function loadBVTable(file) {
+  try {
+    const text = await file.text();
+    const before = Object.keys(state.bvIndex).length;
+    mergeBVData(parseBVTable(text, file.name));
+    const added = Object.keys(state.bvIndex).length - before;
+
+    // Re-attempt lookup for entries the user hasn't manually overridden.
+    let matched = 0;
+    for (const entry of state.roster) {
+      if (entry.bvManual) continue;
+      const bv = lookupBV(entry.name);
+      if (bv != null) { entry.baseBV = bv; matched++; }
+    }
+    renderRoster();
+    alert(`BV table loaded: ${added} entries. Matched ${matched} roster mech${matched !== 1 ? 's' : ''}.`);
+  } catch (err) {
+    alert('Failed to load BV table: ' + err.message);
+  }
+}
+
 // ── Event listeners ────────────────────────────────────────────────────────
 
 document.getElementById('search-input').addEventListener('input', (e) => {
@@ -636,6 +815,11 @@ document.getElementById('folder-input').addEventListener('change', (e) => {
   e.target.value = '';
 });
 
+document.getElementById('bv-input').addEventListener('change', (e) => {
+  if (e.target.files[0]) loadBVTable(e.target.files[0]);
+  e.target.value = '';
+});
+
 document.getElementById('export-btn').addEventListener('click', exportPDF);
 
 document.getElementById('new-lance-btn').addEventListener('click', () => createGroup('lance'));
@@ -644,4 +828,5 @@ document.getElementById('new-star-btn').addEventListener('click', () => createGr
 // ── Boot ───────────────────────────────────────────────────────────────────
 
 renderRoster();
+loadBVData();
 init();

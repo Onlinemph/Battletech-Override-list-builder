@@ -78,6 +78,13 @@ header h1 {
   align-items: center;
 }
 
+.header-sep {
+  width: 1px;
+  height: 28px;
+  background: var(--border);
+  flex-shrink: 0;
+}
+
 /* ── BUTTONS ── */
 .btn {
   display: inline-flex;

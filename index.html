@@ -11,7 +11,7 @@
 <body>
   <header>
     <div class="header-inner">
-      <h1>BATTLETECH ROSTER BUILDER <span class="version">v0.2.0</span></h1>
+      <h1>BATTLETECH ROSTER BUILDER <span class="version">v0.3.0</span></h1>
       <div class="header-actions">
         <label class="btn btn-primary" for="zip-input" title="Load a zip of mech images">
           Load zip
@@ -25,6 +25,13 @@
           Load BV table
           <input type="file" id="bv-input" accept=".csv,.json,.txt">
         </label>
+        <div class="header-sep"></div>
+        <button class="btn btn-secondary" id="save-roster-btn" title="Save roster to a JSON file">Save Roster</button>
+        <label class="btn btn-secondary" for="roster-input" title="Load a previously saved roster JSON">
+          Load Roster
+          <input type="file" id="roster-input" accept=".json">
+        </label>
+        <div class="header-sep"></div>
         <button class="btn btn-export" id="export-btn">Export PDF</button>
       </div>
     </div>

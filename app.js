@@ -119,6 +119,20 @@ function finalizeLibrary() {
   hideStatusMsg();
   renderCategories();
   renderGrid();
+
+  if (state.roster.length === 0 && state.groups.length === 0) {
+    autoRestore();
+  } else {
+    // Re-resolve any entries whose image src is missing (e.g. after page reload)
+    let changed = false;
+    for (const entry of state.roster) {
+      if (!entry.src) {
+        const src = resolveEntrySrc(entry);
+        if (src) { entry.src = src; changed = true; }
+      }
+    }
+    if (changed) renderRoster();
+  }
 }
 
 async function init() {
@@ -235,6 +249,10 @@ function showNoImages() {
 
   const noImg = document.getElementById('no-images-msg');
   if (noImg) noImg.style.display = 'block';
+
+  if (state.roster.length === 0 && state.groups.length === 0) {
+    autoRestore();
+  }
 }
 
 // ── Render ─────────────────────────────────────────────────────────────────
@@ -409,6 +427,7 @@ function renderRoster() {
   }
 
   updateTotals();
+  autoSave();
 }
 
 function buildGroupSection(group, mechs) {
@@ -584,6 +603,112 @@ function makeSkillPair(labelText, entry, key, onChange) {
   wrap.appendChild(lbl);
   wrap.appendChild(input);
   return wrap;
+}
+
+// ── Roster Save / Load ────────────────────────────────────────────────────
+
+function serializeRoster() {
+  return {
+    version: 1,
+    groups: state.groups.map(g => ({ id: g.id, name: g.name, type: g.type })),
+    roster: state.roster.map(e => ({
+      id: e.id,
+      name: e.name,
+      category: e.category,
+      pilotName: e.pilotName,
+      gunnery: e.gunnery,
+      piloting: e.piloting,
+      groupId: e.groupId,
+      baseBV: e.baseBV,
+      bvManual: e.bvManual,
+    })),
+  };
+}
+
+function saveRoster() {
+  if (state.roster.length === 0 && state.groups.length === 0) {
+    alert('Roster is empty — nothing to save.');
+    return;
+  }
+  const blob = new Blob([JSON.stringify(serializeRoster(), null, 2)], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = 'battletech-roster.json';
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+// Try to find the image source for a roster entry in the current library.
+function resolveEntrySrc(entry) {
+  const candidates = entry.category
+    ? [state.library[entry.category], ...Object.values(state.library).filter(c => c !== state.library[entry.category])]
+    : Object.values(state.library);
+  for (const items of candidates) {
+    if (!items) continue;
+    const match = items.find(m => m.name === entry.name);
+    if (match) return match.src;
+  }
+  return '';
+}
+
+function restoreRoster(data) {
+  if (!data || data.version !== 1) return false;
+  const idMap = {};
+  state.groups = (data.groups || []).map(g => {
+    const newId = groupIdCounter++;
+    idMap[g.id] = newId;
+    return { id: newId, name: g.name, type: g.type };
+  });
+  state.activeGroupId = state.groups.at(-1)?.id ?? null;
+  state.roster = (data.roster || []).map(e => ({
+    id: state.nextId++,
+    name: e.name,
+    category: e.category,
+    src: resolveEntrySrc(e),
+    pilotName: e.pilotName || '',
+    gunnery: e.gunnery ?? 4,
+    piloting: e.piloting ?? 5,
+    groupId: e.groupId != null ? (idMap[e.groupId] ?? null) : null,
+    baseBV: e.baseBV ?? null,
+    bvManual: e.bvManual ?? false,
+  }));
+  renderRoster();
+  return true;
+}
+
+async function loadRosterFile(file) {
+  try {
+    const data = JSON.parse(await file.text());
+    if (!restoreRoster(data)) {
+      alert('Unrecognised roster file format.');
+      return;
+    }
+    const missing = state.roster.filter(e => !e.src).length;
+    if (missing > 0) {
+      alert(`Roster loaded. ${missing} image${missing !== 1 ? 's' : ''} not found in the current library — load the image library to restore them.`);
+    }
+  } catch (err) {
+    alert('Failed to load roster: ' + err.message);
+  }
+}
+
+function autoSave() {
+  const save = () => {
+    try { localStorage.setItem('btRosterSave', JSON.stringify(serializeRoster())); } catch (e) {}
+  };
+  typeof requestIdleCallback !== 'undefined' ? requestIdleCallback(save) : setTimeout(save, 0);
+}
+
+function autoRestore() {
+  try {
+    const raw = localStorage.getItem('btRosterSave');
+    if (!raw) return;
+    const data = JSON.parse(raw);
+    if ((data.roster || []).length > 0 || (data.groups || []).length > 0) {
+      restoreRoster(data);
+    }
+  } catch (e) {}
 }
 
 // ── PDF Export ─────────────────────────────────────────────────────────────
@@ -821,6 +946,11 @@ document.getElementById('bv-input').addEventListener('change', (e) => {
 });
 
 document.getElementById('export-btn').addEventListener('click', exportPDF);
+document.getElementById('save-roster-btn').addEventListener('click', saveRoster);
+document.getElementById('roster-input').addEventListener('change', (e) => {
+  if (e.target.files[0]) loadRosterFile(e.target.files[0]);
+  e.target.value = '';
+});
 
 document.getElementById('new-lance-btn').addEventListener('click', () => createGroup('lance'));
 document.getElementById('new-star-btn').addEventListener('click', () => createGroup('star'));

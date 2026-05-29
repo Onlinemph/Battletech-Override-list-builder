@@ -745,6 +745,48 @@ main {
   text-align: right;
 }
 
+/* ── DRAG AND DROP ── */
+.roster-card {
+  cursor: grab;
+}
+.roster-card:active {
+  cursor: grabbing;
+}
+.roster-card.drag-source {
+  opacity: 0.35;
+}
+.roster-card.drag-over-top {
+  border-top: 2px solid var(--gold);
+}
+.roster-card.drag-over-bottom {
+  border-bottom: 2px solid var(--gold);
+}
+.group-section.drag-over-group {
+  border-color: var(--gold);
+  box-shadow: 0 0 0 1px var(--gold-dim) inset;
+}
+.group-section.drag-over-group .group-header {
+  background: #2a200a;
+}
+
+.ungroup-zone {
+  border: 1px dashed #3a3a3a;
+  border-radius: 6px;
+  padding: 10px;
+  text-align: center;
+  color: #444;
+  font-size: 10px;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  transition: border-color 0.12s, color 0.12s, background 0.12s;
+  user-select: none;
+}
+.ungroup-zone.active {
+  border-color: var(--gold-dim);
+  color: var(--gold-dim);
+  background: rgba(201, 168, 76, 0.04);
+}
+
 /* scrollbars */
 ::-webkit-scrollbar {
   width: 6px;

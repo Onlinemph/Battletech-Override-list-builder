@@ -65,6 +65,7 @@ function mergeBVData(data) {
 }
 
 let groupIdCounter = 1;
+let dragSrcId = null;
 
 function makeBlobUrl(blob) {
   const url = URL.createObjectURL(blob);
@@ -426,6 +427,28 @@ function renderRoster() {
     list.appendChild(div);
   }
 
+  // Ungroup drop zone — only shown when groups exist
+  if (state.groups.length > 0) {
+    const zone = document.createElement('div');
+    zone.className = 'ungroup-zone';
+    zone.textContent = 'Drop here to ungroup';
+    zone.addEventListener('dragover', (e) => {
+      if (!dragSrcId) return;
+      e.preventDefault();
+      zone.classList.add('active');
+    });
+    zone.addEventListener('dragleave', () => zone.classList.remove('active'));
+    zone.addEventListener('drop', (e) => {
+      e.preventDefault();
+      zone.classList.remove('active');
+      if (!dragSrcId) return;
+      moveEntry(dragSrcId, null, false, null);
+      dragSrcId = null;
+      renderRoster();
+    });
+    list.appendChild(zone);
+  }
+
   updateTotals();
   autoSave();
 }
@@ -443,6 +466,25 @@ function buildGroupSection(group, mechs) {
   header.addEventListener('click', e => {
     if (e.target.closest('.group-delete')) return;
     state.activeGroupId = group.id;
+    renderRoster();
+  });
+  header.addEventListener('dragover', (e) => {
+    if (!dragSrcId) return;
+    e.preventDefault();
+    e.stopPropagation();
+    clearDropIndicators();
+    section.classList.add('drag-over-group');
+  });
+  header.addEventListener('dragleave', (e) => {
+    if (!header.contains(e.relatedTarget)) section.classList.remove('drag-over-group');
+  });
+  header.addEventListener('drop', (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (!dragSrcId) return;
+    section.classList.remove('drag-over-group');
+    moveEntry(dragSrcId, null, false, group.id);
+    dragSrcId = null;
     renderRoster();
   });
 
@@ -485,6 +527,36 @@ function buildCard(entry) {
   const card = document.createElement('div');
   card.className = 'roster-card';
   card.dataset.id = entry.id;
+
+  card.draggable = true;
+  card.addEventListener('dragstart', (e) => {
+    dragSrcId = entry.id;
+    e.dataTransfer.effectAllowed = 'move';
+    requestAnimationFrame(() => card.classList.add('drag-source'));
+  });
+  card.addEventListener('dragend', () => {
+    clearDropIndicators();
+    document.querySelectorAll('.drag-source').forEach(el => el.classList.remove('drag-source'));
+    dragSrcId = null;
+  });
+  card.addEventListener('dragover', (e) => {
+    if (!dragSrcId || dragSrcId === entry.id) return;
+    e.preventDefault();
+    e.stopPropagation();
+    clearDropIndicators();
+    const mid = card.getBoundingClientRect().top + card.getBoundingClientRect().height / 2;
+    card.classList.add(e.clientY < mid ? 'drag-over-top' : 'drag-over-bottom');
+  });
+  card.addEventListener('drop', (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (!dragSrcId || dragSrcId === entry.id) return;
+    const rect = card.getBoundingClientRect();
+    const targetEntry = state.roster.find(en => en.id === entry.id);
+    moveEntry(dragSrcId, entry.id, e.clientY < rect.top + rect.height / 2, targetEntry?.groupId ?? null);
+    dragSrcId = null;
+    renderRoster();
+  });
 
   const header = document.createElement('div');
   header.className = 'card-header';
@@ -605,6 +677,24 @@ function makeSkillPair(labelText, entry, key, onChange) {
   return wrap;
 }
 
+// ── Drag and drop ────────────────────────────────────────────────────────
+
+function clearDropIndicators() {
+  document.querySelectorAll('.drag-over-top, .drag-over-bottom, .drag-over-group')
+    .forEach(el => el.classList.remove('drag-over-top', 'drag-over-bottom', 'drag-over-group'));
+}
+
+function moveEntry(draggedId, targetId, insertBefore, newGroupId) {
+  const idx = state.roster.findIndex(e => e.id === draggedId);
+  if (idx === -1) return;
+  const [dragged] = state.roster.splice(idx, 1);
+  dragged.groupId = newGroupId;
+  if (targetId == null) { state.roster.push(dragged); return; }
+  let tIdx = state.roster.findIndex(e => e.id === targetId);
+  if (tIdx === -1) { state.roster.push(dragged); return; }
+  state.roster.splice(insertBefore ? tIdx : tIdx + 1, 0, dragged);
+}
+
 // ── Roster Save / Load ────────────────────────────────────────────────────
 
 function serializeRoster() {
@@ -712,6 +802,158 @@ function autoRestore() {
 }
 
 // ── PDF Export ─────────────────────────────────────────────────────────────
+
+function addSummaryPage(doc) {
+  const PW = 792, PH = 612, M = 36;
+  const ROW_H = 13;
+  const PAGE_BOTTOM = PH - M;
+  const C = { unit: M + 4, pilot: M + 290, gun: M + 460, pil: M + 510, bvBase: M + 625, bvAdj: PW - M };
+  const grand = state.roster.reduce((s, e) => s + (entryAdjustedBV(e) || 0), 0);
+
+  doc.addPage();
+
+  function drawPageBg() {
+    doc.setFillColor(26, 26, 26);
+    doc.rect(0, 0, PW, PH, 'F');
+  }
+
+  function drawColHeaders() {
+    doc.setFillColor(35, 28, 10);
+    doc.rect(M, y, PW - 2 * M, ROW_H, 'F');
+    doc.setFont('courier', 'bold');
+    doc.setFontSize(7.5);
+    doc.setTextColor(130, 105, 50);
+    doc.text('UNIT', C.unit, y + 9);
+    doc.text('PILOT', C.pilot, y + 9);
+    doc.text('GUN', C.gun, y + 9, { align: 'center' });
+    doc.text('PIL', C.pil, y + 9, { align: 'center' });
+    doc.text('BASE BV', C.bvBase, y + 9, { align: 'right' });
+    doc.text('ADJ BV', C.bvAdj, y + 9, { align: 'right' });
+    y += ROW_H;
+    doc.setDrawColor(60, 48, 20);
+    doc.setLineWidth(0.3);
+    doc.line(M, y, PW - M, y);
+    y += 3;
+  }
+
+  drawPageBg();
+  let y = M;
+
+  // Title row
+  doc.setFont('courier', 'bold');
+  doc.setFontSize(15);
+  doc.setTextColor(201, 168, 76);
+  doc.text('FORCE SUMMARY', M, y + 12);
+  doc.setFontSize(10);
+  doc.setTextColor(140, 120, 70);
+  doc.text(`${state.roster.length} UNIT${state.roster.length !== 1 ? 'S' : ''}  ·  TOTAL BV ${grand.toLocaleString()}`, PW - M, y + 12, { align: 'right' });
+  doc.setDrawColor(80, 65, 30);
+  doc.setLineWidth(0.5);
+  doc.line(M, y + 18, PW - M, y + 18);
+  y += 30;
+
+  drawColHeaders();
+
+  let rowIdx = 0;
+
+  function checkPageBreak(neededH) {
+    if (y + neededH > PAGE_BOTTOM) {
+      doc.addPage();
+      drawPageBg();
+      y = M;
+      drawColHeaders();
+      rowIdx = 0;
+    }
+  }
+
+  function drawMechRow(entry) {
+    checkPageBreak(ROW_H);
+    if (rowIdx % 2 === 0) {
+      doc.setFillColor(32, 32, 32);
+      doc.rect(M, y, PW - 2 * M, ROW_H, 'F');
+    }
+    doc.setFont('courier', 'normal');
+    doc.setFontSize(8.5);
+    doc.setTextColor(210, 200, 175);
+    const uName = entry.name.length > 32 ? entry.name.substring(0, 31) + '…' : entry.name;
+    doc.text(uName.toUpperCase(), C.unit, y + 9);
+    doc.setTextColor(160, 150, 130);
+    const pilot = (entry.pilotName || '—').substring(0, 22);
+    doc.text(pilot, C.pilot, y + 9);
+    doc.setFont('courier', 'bold');
+    doc.setTextColor(201, 168, 76);
+    doc.text(String(entry.gunnery), C.gun, y + 9, { align: 'center' });
+    doc.text(String(entry.piloting), C.pil, y + 9, { align: 'center' });
+    doc.setFont('courier', 'normal');
+    doc.setTextColor(160, 150, 130);
+    doc.text(entry.baseBV != null ? entry.baseBV.toLocaleString() : '—', C.bvBase, y + 9, { align: 'right' });
+    doc.setFont('courier', 'bold');
+    doc.setTextColor(201, 168, 76);
+    const adj = entryAdjustedBV(entry);
+    doc.text(adj != null ? adj.toLocaleString() : '—', C.bvAdj, y + 9, { align: 'right' });
+    y += ROW_H;
+    rowIdx++;
+  }
+
+  for (const group of state.groups) {
+    const mechs = state.roster.filter(e => e.groupId === group.id);
+    if (mechs.length === 0) continue;
+
+    checkPageBreak(ROW_H * 2 + 4);
+    const isLance = group.type === 'lance';
+    doc.setFillColor(isLance ? 28 : 32, isLance ? 38 : 22, isLance ? 12 : 8);
+    doc.rect(M, y, PW - 2 * M, ROW_H, 'F');
+    doc.setFont('courier', 'bold');
+    doc.setFontSize(8.5);
+    if (isLance) doc.setTextColor(154, 191, 85);
+    else doc.setTextColor(201, 168, 76);
+    doc.text(group.name.toUpperCase(), C.unit, y + 9);
+    y += ROW_H;
+    rowIdx = 0;
+
+    mechs.forEach(drawMechRow);
+
+    checkPageBreak(ROW_H + 4);
+    doc.setFillColor(38, 30, 10);
+    doc.rect(M, y, PW - 2 * M, ROW_H, 'F');
+    doc.setFont('courier', 'bold');
+    doc.setFontSize(7.5);
+    doc.setTextColor(130, 105, 50);
+    doc.text(group.name.toUpperCase() + '  SUBTOTAL', C.pilot, y + 9);
+    doc.setTextColor(201, 168, 76);
+    doc.text(groupAdjustedTotal(group.id).toLocaleString(), C.bvAdj, y + 9, { align: 'right' });
+    y += ROW_H + 4;
+    rowIdx = 0;
+  }
+
+  const ungrouped = state.roster.filter(e => !e.groupId);
+  if (ungrouped.length > 0) {
+    checkPageBreak(ROW_H * 2);
+    doc.setFillColor(32, 32, 32);
+    doc.rect(M, y, PW - 2 * M, ROW_H, 'F');
+    doc.setFont('courier', 'bold');
+    doc.setFontSize(8.5);
+    doc.setTextColor(150, 140, 120);
+    doc.text('UNGROUPED', C.unit, y + 9);
+    y += ROW_H;
+    rowIdx = 0;
+    ungrouped.forEach(drawMechRow);
+    y += 4;
+  }
+
+  // Grand total
+  checkPageBreak(ROW_H + 8);
+  doc.setFillColor(45, 35, 12);
+  doc.rect(M, y, PW - 2 * M, ROW_H + 4, 'F');
+  doc.setDrawColor(100, 80, 40);
+  doc.setLineWidth(0.5);
+  doc.line(M, y, PW - M, y);
+  doc.setFont('courier', 'bold');
+  doc.setFontSize(10);
+  doc.setTextColor(201, 168, 76);
+  doc.text('GRAND TOTAL', C.pilot, y + ROW_H * 0.72 + 2);
+  doc.text(grand.toLocaleString(), C.bvAdj, y + ROW_H * 0.72 + 2, { align: 'right' });
+}
 
 async function renderCardCanvas(entry) {
   // Canvas sized at ~1.4:1 to match Override card proportions
@@ -856,6 +1098,7 @@ async function exportPDF() {
       doc.addImage(canvas, 'PNG', x, y, CARD_W, CARD_H, '', 'FAST');
     });
 
+    addSummaryPage(doc);
     doc.save('battletech-roster.pdf');
   } finally {
     btn.disabled = false;

@@ -5,7 +5,7 @@ Usage:
     python resize-images.py <path-to-your-image-folder>
 
 Reads images from the source folder (subfolders = categories), resizes
-each to at most 500x500px, and writes them to images/<Category>/<name>.png
+each to at most 800x800px, and writes them to images/<Category>/<name>.png
 in the current directory. Preserves transparency.
 
 Requires Pillow:
@@ -17,7 +17,7 @@ import sys
 from pathlib import Path
 from PIL import Image
 
-MAX_SIZE  = 500
+MAX_SIZE  = 800
 VALID_EXT = {'.png', '.jpg', '.jpeg', '.webp'}
 OUT_DIR   = Path('images')
 
@@ -39,7 +39,7 @@ def main():
 
     total = len(image_files)
     print(f"Found {total} images in {src_root}")
-    print(f"Resizing to max {MAX_SIZE}px and writing to {OUT_DIR.resolve()}/\n")
+    print(f"Resizing to max {MAX_SIZE}px (good PDF quality) and writing to {OUT_DIR.resolve()}/\n")
 
     done = 0
     skipped = 0
